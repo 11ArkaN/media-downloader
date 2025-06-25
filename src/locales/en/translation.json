@@ -1,0 +1,331 @@
+{
+  "settings": {
+    "title": "Settings",
+    "description": "Customize the application to your liking.",
+    "save_button": "Save Settings",
+    "saving_button": "Saving...",
+    "dependencies": {
+      "title": "Dependencies Status",
+      "check_button": "Re-check Dependencies",
+      "checking_button": "Checking...",
+      "ytdlp_version": "yt-dlp Version",
+      "ytdlp_description": "Video downloader",
+      "ffmpeg_version": "FFmpeg Version",
+      "ffmpeg_description": "Video processor",
+      "not_found": "Not found",
+      "missing_dependencies": "Missing Dependencies",
+      "missing_dependencies_description": "Some dependencies are missing. Please install them for full functionality."
+    },
+    "sections": {
+      "download": {
+        "title": "Download Settings",
+        "download_folder": {
+          "label": "Download Folder",
+          "description": "Default location for downloaded files"
+        },
+        "concurrent_downloads": {
+          "label": "Concurrent Downloads",
+          "description": "Maximum number of simultaneous downloads"
+        },
+        "default_quality": {
+          "label": "Default Quality",
+          "description": "Preferred video quality for downloads",
+          "options": {
+            "best": "Best Quality",
+            "worst": "Worst Quality"
+          }
+        }
+      },
+      "application": {
+        "title": "Application",
+        "theme": {
+          "label": "Theme",
+          "description": "Application theme preference",
+          "options": {
+            "dark": "Dark",
+            "light": "Light",
+            "system": "System"
+          }
+        },
+        "language": {
+          "label": "Language",
+          "description": "Interface language",
+          "options": {
+            "en": "English",
+            "pl": "Polski"
+          }
+        },
+        "start_with_system": {
+          "label": "Start with System",
+          "description": "Launch the app when system starts"
+        },
+        "notifications": {
+          "label": "Notifications",
+          "description": "Show download completion notifications"
+        }
+      },
+      "advanced": {
+        "title": "Advanced",
+        "ytdlp_path": {
+          "label": "yt-dlp Path",
+          "description": "Custom path to yt-dlp executable"
+        },
+        "ffmpeg_path": {
+          "label": "FFmpeg Path",
+          "description": "Custom path to FFmpeg executable"
+        },
+        "custom_args": {
+          "label": "Custom Arguments",
+          "description": "Additional command-line arguments for yt-dlp"
+        }
+      }
+    }
+  },
+  "app": {
+    "title": "Media Downloader",
+    "subtitle": "Powered by yt-dlp & ffmpeg",
+    "status": "Ready",
+    "tabs": {
+      "download": "Download",
+      "edit": "Edit",
+      "files": "Files",
+      "settings": "Settings"
+    }
+  },
+  "download_section": {
+    "title": "Download Media",
+    "url_label": "Video URL",
+    "url_placeholder": "Paste YouTube, Vimeo, or other supported URL...",
+    "format_label": "Format",
+    "output_folder_label": "Output Folder",
+    "output_folder_placeholder": "Choose download location...",
+    "start_download_button": "Start Download",
+    "download_queue_title": "Download Queue",
+    "select_folder_title": "Select download folder",
+    "failed_to_open_dialog": "Failed to open folder dialog: ",
+    "format_options": {
+      "best": "Best Quality",
+      "worst": "Worst Quality",
+      "bestvideo_bestaudio": "Best Video + Audio",
+      "mp4": "MP4 Format",
+      "webm": "WebM Format",
+      "bestaudio": "Audio Only"
+    }
+  },
+  "file_explorer": {
+    "video_player_close_button": "Close",
+    "select_directory_title": "Select directory to browse",
+    "failed_to_open_file": "Failed to open file: ",
+    "edit_warning": "Only video files can be edited in the video editor",
+    "delete_confirmation": "Are you sure you want to delete {{fileName}}?",
+    "failed_to_delete_file": "Failed to delete file: ",
+    "search_placeholder": "Search files...",
+    "view_mode_grid": "Grid",
+    "view_mode_list": "List",
+    "sort_by_label": "Sort by",
+    "filter_by_label": "Filter",
+    "sort_options": {
+      "name": "Name",
+      "date": "Date",
+      "size": "Size",
+      "type": "Type"
+    },
+    "filter_options": {
+      "all": "All",
+      "video": "Videos",
+      "audio": "Audio",
+      "image": "Images"
+    },
+    "no_files_found": "No files found in this directory.",
+    "loading_files": "Loading files...",
+    "file_actions": {
+      "preview": "Preview",
+      "show_in_folder": "Show in folder",
+      "edit": "Edit",
+      "delete": "Delete",
+      "play_in_app": "Play in App"
+    },
+    "current_directory": "Current Directory",
+    "change_directory_button": "Change",
+    "refresh_button": "Refresh"
+  },
+  "editSection": {
+    "videoLibrary": {
+      "title": "Video Editor",
+      "loading": "Loading...",
+      "noVideoSelected": "No video selected",
+      "library": "Library",
+      "import": "Import",
+      "selectVideoMessage": "Select a video to start editing"
+    },
+    "panels": {
+      "tools": "Tools",
+      "effects": "Effects", 
+      "audio": "Audio",
+      "export": "Export"
+    },
+    "tools": {
+      "title": "Editing Tools",
+      "visualCrop": "Visual Crop",
+      "manualCrop": "Manual Crop",
+      "cropInstructions": "Drag to move, corners to resize",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "rotate90": "Rotate 90°",
+      "addText": "Add Text",
+      "speed": "Speed"
+    },
+    "effects": {
+      "title": "Visual Effects",
+      "brightness": "Brightness",
+      "contrast": "Contrast",
+      "saturation": "Saturation",
+      "blur": "Blur",
+      "sharpen": "Sharpen",
+      "applyBrightness": "Apply Brightness",
+      "applyContrast": "Apply Contrast",
+      "applySaturation": "Apply Saturation",
+      "applyBlur": "Apply Blur",
+      "applySharpen": "Apply Sharpen",
+      "presetEffects": "Preset Effects",
+      "grayscale": "Grayscale",
+      "sepia": "Sepia",
+      "vintage": "Vintage",
+      "invert": "Invert"
+    },
+    "audio": {
+      "title": "Audio Tools",
+      "volume": "Volume",
+      "muteAudio": "Mute Audio"
+    },
+    "export": {
+      "title": "Export Video",
+      "operationsReady": "{{count}} operations ready",
+      "exportToFile": "Export to File",
+      "exportToLibrary": "Export to Library"
+    },
+    "editQueue": {
+      "title": "Edit Queue"
+    },
+    "controls": {
+      "trim": "Trim",
+      "to": "to"
+    },
+    "modal": {
+      "videoLibrary": {
+        "title": "Video Library",
+        "noVideosFound": "No videos found in library"
+      },
+      "cropSettings": {
+        "title": "Crop Settings",
+        "xPosition": "X Position",
+        "yPosition": "Y Position", 
+        "width": "Width",
+        "height": "Height",
+        "cancel": "Cancel",
+        "applyCrop": "Apply Crop"
+      },
+      "addText": {
+        "title": "Add Text",
+        "text": "Text",
+        "placeholder": "Enter your text...",
+        "xPosition": "X Position (%)",
+        "yPosition": "Y Position (%)",
+        "fontSize": "Font Size",
+        "color": "Color",
+        "fontFamily": "Font Family",
+        "duration": "Duration (seconds)",
+        "startTime": "Start Time (seconds)",
+        "cancel": "Cancel",
+        "addText": "Add Text"
+      }
+    },
+    "dialogs": {
+      "selectVideoFile": "Select video file",
+      "videoFiles": "Video Files",
+      "saveEditedVideo": "Save edited video"
+    },
+    "toasts": {
+      "exportComplete": {
+        "title": "Export Complete",
+        "message": "Your video has been successfully exported!"
+      },
+      "exportFailed": {
+        "title": "Export Failed", 
+        "message": "An unknown error occurred during export"
+      },
+      "libraryError": {
+        "title": "Library Error",
+        "message": "Failed to load video library"
+      },
+      "fileSelectionError": {
+        "title": "File Selection Error",
+        "message": "Failed to open file dialog"
+      },
+      "videoLoaded": {
+        "title": "Video Loaded",
+        "message": "Successfully loaded {{fileName}}"
+      },
+      "videoLoadError": {
+        "title": "Video Load Error",
+        "message": "Failed to load video file"
+      },
+      "trimAdded": {
+        "title": "Trim Added",
+        "message": "Trim from {{start}} to {{end}}"
+      },
+      "cropAdded": {
+        "title": "Crop Added", 
+        "message": "Crop to {{width}}×{{height}}"
+      },
+      "filterAdded": {
+        "title": "Filter Added",
+        "message": "Applied {{filterType}} filter"
+      },
+      "volumeAdded": {
+        "title": "Volume Added",
+        "message": "Volume set to {{volume}}%"
+      },
+      "rotationAdded": {
+        "title": "Rotation Added",
+        "message": "Rotate {{angle}}°"
+      },
+      "speedAdded": {
+        "title": "Speed Added",
+        "message": "Speed set to {{speed}}x"
+      },
+      "textRequired": {
+        "title": "Text Required",
+        "message": "Please enter some text"
+      },
+      "textAdded": {
+        "title": "Text Added",
+        "message": "Text: \"{{text}}\""
+      },
+      "operationRemoved": {
+        "title": "Operation Removed",
+        "message": "Edit operation has been removed"
+      },
+      "operationsReordered": {
+        "title": "Operations Reordered",
+        "message": "Edit queue has been updated"
+      },
+      "exportWarning": {
+        "title": "Export Warning",
+        "message": "Please select a video and add at least one edit operation"
+      },
+      "exportStarted": {
+        "title": "Export Started",
+        "message": "Video export has begun..."
+      },
+      "exportError": {
+        "title": "Export Error",
+        "message": "Failed to export video: {{error}}"
+      },
+      "exportToLibraryStarted": {
+        "title": "Export to Library Started",
+        "message": "Video will be saved to your library..."
+      }
+    }
+  }
+} 

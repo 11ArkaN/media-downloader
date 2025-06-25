@@ -1,0 +1,331 @@
+{
+  "settings": {
+    "title": "Ustawienia",
+    "description": "Dostosuj aplikację do swoich upodobań.",
+    "save_button": "Zapisz ustawienia",
+    "saving_button": "Zapisywanie...",
+    "dependencies": {
+      "title": "Status zależności",
+      "check_button": "Sprawdź ponownie zależności",
+      "checking_button": "Sprawdzanie...",
+      "ytdlp_version": "Wersja yt-dlp",
+      "ytdlp_description": "Narzędzie do pobierania wideo",
+      "ffmpeg_version": "Wersja FFmpeg",
+      "ffmpeg_description": "Procesor wideo",
+      "not_found": "Nie znaleziono",
+      "missing_dependencies": "Brakujące zależności",
+      "missing_dependencies_description": "Brakuje niektórych zależności. Zainstaluj je, aby uzyskać pełną funkcjonalność."
+    },
+    "sections": {
+      "download": {
+        "title": "Ustawienia pobierania",
+        "download_folder": {
+          "label": "Folder pobierania",
+          "description": "Domyślna lokalizacja dla pobranych plików"
+        },
+        "concurrent_downloads": {
+          "label": "Jednoczesne pobierania",
+          "description": "Maksymalna liczba jednoczesnych pobierań"
+        },
+        "default_quality": {
+          "label": "Domyślna jakość",
+          "description": "Preferowana jakość wideo do pobrania",
+          "options": {
+            "best": "Najlepsza jakość",
+            "worst": "Najgorsza jakość"
+          }
+        }
+      },
+      "application": {
+        "title": "Aplikacja",
+        "theme": {
+          "label": "Motyw",
+          "description": "Preferencje motywu aplikacji",
+          "options": {
+            "dark": "Ciemny",
+            "light": "Jasny",
+            "system": "Systemowy"
+          }
+        },
+        "language": {
+          "label": "Język",
+          "description": "Język interfejsu",
+          "options": {
+            "en": "Angielski",
+            "pl": "Polski"
+          }
+        },
+        "start_with_system": {
+          "label": "Uruchom z systemem",
+          "description": "Uruchom aplikację podczas startu systemu"
+        },
+        "notifications": {
+          "label": "Powiadomienia",
+          "description": "Pokazuj powiadomienia o zakończeniu pobierania"
+        }
+      },
+      "advanced": {
+        "title": "Zaawansowane",
+        "ytdlp_path": {
+          "label": "Ścieżka do yt-dlp",
+          "description": "Niestandardowa ścieżka do pliku wykonywalnego yt-dlp"
+        },
+        "ffmpeg_path": {
+          "label": "Ścieżka do FFmpeg",
+          "description": "Niestandardowa ścieżka do pliku wykonywalnego FFmpeg"
+        },
+        "custom_args": {
+          "label": "Argumenty niestandardowe",
+          "description": "Dodatkowe argumenty wiersza poleceń dla yt-dlp"
+        }
+      }
+    }
+  },
+  "app": {
+    "title": "Media Downloader",
+    "subtitle": "Zasilany przez yt-dlp i ffmpeg",
+    "status": "Gotowy",
+    "tabs": {
+      "download": "Pobierz",
+      "edit": "Edytuj",
+      "files": "Pliki",
+      "settings": "Ustawienia"
+    }
+  },
+  "download_section": {
+    "title": "Pobierz Media",
+    "url_label": "URL Wideo",
+    "url_placeholder": "Wklej link z YouTube, Vimeo, lub inny obsługiwany...",
+    "format_label": "Format",
+    "output_folder_label": "Folder Docelowy",
+    "output_folder_placeholder": "Wybierz lokalizację pobierania...",
+    "start_download_button": "Rozpocznij Pobieranie",
+    "download_queue_title": "Kolejka Pobierania",
+    "select_folder_title": "Wybierz folder pobierania",
+    "failed_to_open_dialog": "Nie udało się otworzyć okna wyboru folderu: ",
+    "format_options": {
+      "best": "Najlepsza Jakość",
+      "worst": "Najgorsza Jakość",
+      "bestvideo_bestaudio": "Najlepsze Wideo + Audio",
+      "mp4": "Format MP4",
+      "webm": "Format WebM",
+      "bestaudio": "Tylko Audio"
+    }
+  },
+  "file_explorer": {
+    "video_player_close_button": "Zamknij",
+    "select_directory_title": "Wybierz folder do przeglądania",
+    "failed_to_open_file": "Nie udało się otworzyć pliku: ",
+    "edit_warning": "Tylko pliki wideo mogą być edytowane w edytorze wideo",
+    "delete_confirmation": "Czy na pewno chcesz usunąć {{fileName}}?",
+    "failed_to_delete_file": "Nie udało się usunąć pliku: ",
+    "search_placeholder": "Szukaj plików...",
+    "view_mode_grid": "Siatka",
+    "view_mode_list": "Lista",
+    "sort_by_label": "Sortuj według",
+    "filter_by_label": "Filtruj",
+    "sort_options": {
+      "name": "Nazwa",
+      "date": "Data",
+      "size": "Rozmiar",
+      "type": "Typ"
+    },
+    "filter_options": {
+      "all": "Wszystkie",
+      "video": "Wideo",
+      "audio": "Audio",
+      "image": "Obrazy"
+    },
+    "no_files_found": "Nie znaleziono plików w tym folderze.",
+    "loading_files": "Ładowanie plików...",
+    "file_actions": {
+      "preview": "Podgląd",
+      "show_in_folder": "Pokaż w folderze",
+      "edit": "Edytuj",
+      "delete": "Usuń",
+      "play_in_app": "Odtwórz w aplikacji"
+    },
+    "current_directory": "Bieżący Folder",
+    "change_directory_button": "Zmień",
+    "refresh_button": "Odśwież"
+  },
+  "editSection": {
+    "videoLibrary": {
+      "title": "Edytor Wideo",
+      "loading": "Ładowanie...",
+      "noVideoSelected": "Nie wybrano wideo",
+      "library": "Biblioteka",
+      "import": "Importuj",
+      "selectVideoMessage": "Wybierz wideo, aby rozpocząć edycję"
+    },
+    "panels": {
+      "tools": "Narzędzia",
+      "effects": "Efekty", 
+      "audio": "Audio",
+      "export": "Eksport"
+    },
+    "tools": {
+      "title": "Narzędzia edycji",
+      "visualCrop": "Kadrowanie wizualne",
+      "manualCrop": "Kadrowanie manualne",
+      "cropInstructions": "Przeciągnij, aby przenieść, rogi aby zmienić rozmiar",
+      "apply": "Zastosuj",
+      "cancel": "Anuluj",
+      "rotate90": "Obróć o 90°",
+      "addText": "Dodaj tekst",
+      "speed": "Prędkość"
+    },
+    "effects": {
+      "title": "Efekty wizualne",
+      "brightness": "Jasność",
+      "contrast": "Kontrast",
+      "saturation": "Nasycenie",
+      "blur": "Rozmycie",
+      "sharpen": "Wyostrzenie",
+      "applyBrightness": "Zastosuj jasność",
+      "applyContrast": "Zastosuj kontrast",
+      "applySaturation": "Zastosuj nasycenie",
+      "applyBlur": "Zastosuj rozmycie",
+      "applySharpen": "Zastosuj wyostrzenie",
+      "presetEffects": "Gotowe efekty",
+      "grayscale": "Skala szarości",
+      "sepia": "Sepia",
+      "vintage": "Vintage",
+      "invert": "Odwróć"
+    },
+    "audio": {
+      "title": "Narzędzia audio",
+      "volume": "Głośność",
+      "muteAudio": "Wycisz audio"
+    },
+    "export": {
+      "title": "Eksportuj wideo",
+      "operationsReady": "{{count}} operacji gotowych",
+      "exportToFile": "Eksportuj do pliku",
+      "exportToLibrary": "Eksportuj do biblioteki"
+    },
+    "editQueue": {
+      "title": "Kolejka edycji"
+    },
+    "controls": {
+      "trim": "Przytnij",
+      "to": "do"
+    },
+    "modal": {
+      "videoLibrary": {
+        "title": "Biblioteka wideo",
+        "noVideosFound": "Nie znaleziono wideo w bibliotece"
+      },
+      "cropSettings": {
+        "title": "Ustawienia kadrowania",
+        "xPosition": "Pozycja X",
+        "yPosition": "Pozycja Y", 
+        "width": "Szerokość",
+        "height": "Wysokość",
+        "cancel": "Anuluj",
+        "applyCrop": "Zastosuj kadrowanie"
+      },
+      "addText": {
+        "title": "Dodaj tekst",
+        "text": "Tekst",
+        "placeholder": "Wprowadź tekst...",
+        "xPosition": "Pozycja X (%)",
+        "yPosition": "Pozycja Y (%)",
+        "fontSize": "Rozmiar czcionki",
+        "color": "Kolor",
+        "fontFamily": "Rodzina czcionki",
+        "duration": "Czas trwania (sekundy)",
+        "startTime": "Czas rozpoczęcia (sekundy)",
+        "cancel": "Anuluj",
+        "addText": "Dodaj tekst"
+      }
+    },
+    "dialogs": {
+      "selectVideoFile": "Wybierz plik wideo",
+      "videoFiles": "Pliki wideo",
+      "saveEditedVideo": "Zapisz edytowane wideo"
+    },
+    "toasts": {
+      "exportComplete": {
+        "title": "Eksport zakończony",
+        "message": "Twoje wideo zostało pomyślnie wyeksportowane!"
+      },
+      "exportFailed": {
+        "title": "Eksport nieudany", 
+        "message": "Wystąpił nieznany błąd podczas eksportu"
+      },
+      "libraryError": {
+        "title": "Błąd biblioteki",
+        "message": "Nie udało się załadować biblioteki wideo"
+      },
+      "fileSelectionError": {
+        "title": "Błąd wyboru pliku",
+        "message": "Nie udało się otworzyć okna wyboru pliku"
+      },
+      "videoLoaded": {
+        "title": "Wideo załadowane",
+        "message": "Pomyślnie załadowano {{fileName}}"
+      },
+      "videoLoadError": {
+        "title": "Błąd ładowania wideo",
+        "message": "Nie udało się załadować pliku wideo"
+      },
+      "trimAdded": {
+        "title": "Dodano przycinanie",
+        "message": "Przytnij od {{start}} do {{end}}"
+      },
+      "cropAdded": {
+        "title": "Dodano kadrowanie", 
+        "message": "Kadruj do {{width}}×{{height}}"
+      },
+      "filterAdded": {
+        "title": "Dodano filtr",
+        "message": "Zastosowano filtr {{filterType}}"
+      },
+      "volumeAdded": {
+        "title": "Dodano głośność",
+        "message": "Ustawiono głośność na {{volume}}%"
+      },
+      "rotationAdded": {
+        "title": "Dodano obrót",
+        "message": "Obróć o {{angle}}°"
+      },
+      "speedAdded": {
+        "title": "Dodano prędkość",
+        "message": "Ustawiono prędkość na {{speed}}x"
+      },
+      "textRequired": {
+        "title": "Wymagany tekst",
+        "message": "Proszę wprowadzić tekst"
+      },
+      "textAdded": {
+        "title": "Dodano tekst",
+        "message": "Tekst: \"{{text}}\""
+      },
+      "operationRemoved": {
+        "title": "Usunięto operację",
+        "message": "Operacja edycji została usunięta"
+      },
+      "operationsReordered": {
+        "title": "Zmieniono kolejność operacji",
+        "message": "Kolejka edycji została zaktualizowana"
+      },
+      "exportWarning": {
+        "title": "Ostrzeżenie eksportu",
+        "message": "Proszę wybrać wideo i dodać co najmniej jedną operację edycji"
+      },
+      "exportStarted": {
+        "title": "Rozpoczęto eksport",
+        "message": "Eksport wideo został rozpoczęty..."
+      },
+      "exportError": {
+        "title": "Błąd eksportu",
+        "message": "Nie udało się wyeksportować wideo: {{error}}"
+      },
+      "exportToLibraryStarted": {
+        "title": "Rozpoczęto eksport do biblioteki",
+        "message": "Wideo zostanie zapisane w bibliotece..."
+      }
+    }
+  }
+} 
