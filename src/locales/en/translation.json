@@ -143,11 +143,27 @@
       "show_in_folder": "Show in folder",
       "edit": "Edit",
       "delete": "Delete",
-      "play_in_app": "Play in App"
+      "play_in_app": "Play in App",
+      "open_external": "Open with system app"
     },
     "current_directory": "Current Directory",
     "change_directory_button": "Change",
-    "refresh_button": "Refresh"
+    "refresh_button": "Refresh",
+    "selection_count": "{{count}} items selected",
+    "select_all": "Select All",
+    "clear_selection": "Clear Selection",
+    "delete_selected": "Delete Selected",
+    "play_selected_videos": "Play {{count}} Videos",
+    "delete_multiple_confirmation": "Are you sure you want to delete {{count}} files?\n\nFiles to delete:\n{{fileNames}}",
+    "failed_to_delete_files": "Failed to delete some files: ",
+    "no_videos_selected": "No video files selected",
+    "confirm_delete_single": "Delete File",
+    "confirm_delete_multiple": "Delete {{count}} Files",
+    "delete_warning_modal": "This action cannot be undone.",
+    "and_more_files": "...and {{count}} more files",
+    "cancel": "Cancel",
+    "delete_file": "Delete",
+    "delete_files": "Delete {{count}} Files"
   },
   "editSection": {
     "videoLibrary": {

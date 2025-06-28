@@ -1,3 +1,4 @@
+use http_range::HttpRange;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::path::PathBuf;
@@ -7,6 +8,8 @@ use uuid::Uuid;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::Mutex;
 use warp::Filter;
+use warp::http::{header, StatusCode};
+use base64::{Engine as _, engine::general_purpose};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadRequest {
@@ -399,19 +402,17 @@ async fn execute_video_processing(
                     let font_path = format!("C:/Windows/Fonts/{}.ttf", font_family);
                     
                     // Escape special characters for ffmpeg's filter syntax.
-                    // The path needs to have colons and backslashes escaped.
-                    let escaped_font_path = font_path
-                        .replace("\\", "\\\\")
-                        .replace(":", "\\\\:");
+                    // The path needs to have colons and backslashes escaped for ffmpeg's parser.
+                    let escaped_font_path = font_path.replace("\\", "\\\\").replace(":", "\\:");
 
                     // The text needs to have single quotes, colons and other special chars escaped.
                     let escaped_text = text
                         .replace("\\", "\\\\")
-                        .replace("'", "\\\\'")
-                        .replace(":", "\\\\:")
-                        .replace(",", "\\\\,");
+                        .replace("'", "\\'")
+                        .replace(":", "\\:")
+                        .replace(",", "\\,");
 
-                    // Convert HTML-style #RRGGBB to FFmpeg-friendly 0xRRGGBB
+                    // Convert HTML-style #RRGGBB to FFmpeg-friendly &HBBGGRR&
                     let escaped_color = if let Some(hex) = color.strip_prefix('#') {
                         format!("0x{}", hex)
                     } else {
@@ -657,6 +658,7 @@ async fn start_video_server() -> Result<u16, String> {
     
     // Start the server
     let server = warp::path!("video" / String)
+        .and(warp::header::optional::<String>("range"))
         .and(warp::get())
         .and_then(serve_video_file);
     
@@ -722,31 +724,57 @@ async fn find_available_port() -> Result<u16, String> {
     Err("No available ports found".to_string())
 }
 
-async fn serve_video_file(_filename: String) -> Result<impl warp::Reply, warp::Rejection> {
+async fn serve_video_file(_filename: String, range_header: Option<String>) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     let current_path_guard = CURRENT_VIDEO_PATH.lock().await;
     
     if let Some(video_path) = current_path_guard.as_ref() {
         let path = PathBuf::from(video_path);
         
         if path.exists() {
-            let file = tokio::fs::File::open(&path).await
-                .map_err(|_| warp::reject::not_found())?;
+            let file_size = tokio::fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0);
+            let mut file = tokio::fs::File::open(&path).await.map_err(|_| warp::reject::not_found())?;
             
-            let mime_type = mime_guess::from_path(&path)
-                .first_or_octet_stream()
-                .to_string();
-            
+            let mime_type = mime_guess::from_path(&path).first_or_octet_stream().to_string();
+
+            if let Some(range_str) = range_header {
+                if let Ok(ranges) = HttpRange::parse(&range_str, file_size) {
+                    if let Some(range) = ranges.first() {
+                        use tokio::io::{AsyncReadExt, AsyncSeekExt};
+                        let start = range.start;
+                        let len = range.length;
+                        let end = start + len - 1;
+
+                        file.seek(std::io::SeekFrom::Start(start)).await.map_err(|_| warp::reject::custom(ServerError))?;
+                        
+                        let mut buffer = vec![0; len as usize];
+                        file.read_exact(&mut buffer).await.map_err(|_| warp::reject::custom(ServerError))?;
+
+                        let response = warp::http::Response::builder()
+                            .status(StatusCode::PARTIAL_CONTENT)
+                            .header(header::CONTENT_RANGE, format!("bytes {}-{}/{}", start, end, file_size))
+                            .header(header::CONTENT_LENGTH, len)
+                            .header(header::ACCEPT_RANGES, "bytes")
+                            .header(header::CONTENT_TYPE, mime_type.clone())
+                            .body(buffer)
+                            .map_err(|_| warp::reject::custom(ServerError))?;
+                        return Ok(Box::new(response));
+                    }
+                }
+            }
+
+            // No range header or invalid range, serve the whole file
             let stream = tokio_util::io::ReaderStream::new(file);
             let body = warp::hyper::Body::wrap_stream(stream);
             
             let response = warp::http::Response::builder()
-                .header("content-type", mime_type)
-                .header("accept-ranges", "bytes")
-                .header("access-control-allow-origin", "*")
+                .status(StatusCode::OK)
+                .header(header::CONTENT_LENGTH, file_size)
+                .header(header::CONTENT_TYPE, mime_type.clone())
+                .header(header::ACCEPT_RANGES, "bytes")
                 .body(body)
                 .map_err(|_| warp::reject::custom(ServerError))?;
             
-            return Ok(response);
+            return Ok(Box::new(response));
         }
     }
     
@@ -783,6 +811,77 @@ async fn check_dependencies() -> Result<serde_json::Value, String> {
         "ytdlp": ytdlp_version,
         "ffmpeg": ffmpeg_version
     }))
+}
+
+#[tauri::command]
+async fn generate_thumbnail_data(file_path: String) -> Result<String, String> {
+    let input_path = std::path::PathBuf::from(&file_path);
+    
+    if !input_path.exists() {
+        return Err("Input file does not exist".to_string());
+    }
+
+    // Get file extension to determine how to handle it
+    let extension = input_path.extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    // For images, read and encode as base64
+    if ["jpg", "jpeg", "png", "gif", "webp", "bmp"].contains(&extension.as_str()) {
+        match std::fs::read(&input_path) {
+            Ok(image_data) => {
+                let mime_type = match extension.as_str() {
+                    "jpg" | "jpeg" => "image/jpeg",
+                    "png" => "image/png",
+                    "gif" => "image/gif",
+                    "webp" => "image/webp",
+                    "bmp" => "image/bmp",
+                    _ => "image/jpeg",
+                };
+                let base64_data = general_purpose::STANDARD.encode(&image_data);
+                return Ok(format!("data:{};base64,{}", mime_type, base64_data));
+            }
+            Err(e) => return Err(format!("Failed to read image file: {}", e)),
+        }
+    }
+
+    // For videos, use FFmpeg to extract thumbnail to stdout and encode as base64
+    if ["mp4", "avi", "mov", "mkv", "webm", "flv", "wmv", "m4v", "3gp"].contains(&extension.as_str()) {
+        let mut cmd = Command::new("ffmpeg");
+        cmd.arg("-i")
+            .arg(&file_path)
+            .arg("-ss")
+            .arg("00:00:01") // Seek to 1 second (safer than 10 for short videos)
+            .arg("-vframes")
+            .arg("1") // Extract only 1 frame
+            .arg("-q:v")
+            .arg("2") // High quality
+            .arg("-vf")
+            .arg("scale=320:240:force_original_aspect_ratio=decrease") // Scale to max 320x240
+            .arg("-f")
+            .arg("image2pipe") // Output to pipe
+            .arg("-vcodec")
+            .arg("mjpeg") // JPEG format
+            .arg("-");
+
+        let output = cmd.output()
+            .map_err(|e| format!("Failed to execute FFmpeg: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("FFmpeg thumbnail extraction failed: {}", stderr));
+        }
+
+        if !output.stdout.is_empty() {
+            let base64_data = general_purpose::STANDARD.encode(&output.stdout);
+            return Ok(format!("data:image/jpeg;base64,{}", base64_data));
+        } else {
+            return Err("No thumbnail data generated".to_string());
+        }
+    }
+
+    Err(format!("Unsupported file type: {}", extension))
 }
 
 #[tauri::command]
@@ -855,6 +954,7 @@ pub fn run() {
             open_file,
             start_video_server,
             get_video_url,
+            generate_thumbnail_data,
             show_in_explorer
         ])
         .run(tauri::generate_context!())

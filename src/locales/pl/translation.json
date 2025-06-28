@@ -143,11 +143,27 @@
       "show_in_folder": "Pokaż w folderze",
       "edit": "Edytuj",
       "delete": "Usuń",
-      "play_in_app": "Odtwórz w aplikacji"
+      "play_in_app": "Odtwórz w aplikacji",
+      "open_external": "Otwórz aplikacją systemową"
     },
     "current_directory": "Bieżący Folder",
     "change_directory_button": "Zmień",
-    "refresh_button": "Odśwież"
+    "refresh_button": "Odśwież",
+    "selection_count": "Wybrano {{count}} elementów",
+    "select_all": "Zaznacz wszystko",
+    "clear_selection": "Wyczyść zaznaczenie",
+    "delete_selected": "Usuń zaznaczone",
+    "play_selected_videos": "Odtwórz {{count}} filmów",
+    "delete_multiple_confirmation": "Czy na pewno chcesz usunąć {{count}} plików?\n\nPliki do usunięcia:\n{{fileNames}}",
+    "failed_to_delete_files": "Nie udało się usunąć niektórych plików: ",
+    "no_videos_selected": "Nie wybrano plików wideo",
+    "confirm_delete_single": "Usuń Plik",
+    "confirm_delete_multiple": "Usuń {{count}} Plików",
+    "delete_warning_modal": "Ta akcja nie może być cofnięta.",
+    "and_more_files": "...i {{count}} więcej plików",
+    "cancel": "Anuluj",
+    "delete_file": "Usuń",
+    "delete_files": "Usuń {{count}} Plików"
   },
   "editSection": {
     "videoLibrary": {

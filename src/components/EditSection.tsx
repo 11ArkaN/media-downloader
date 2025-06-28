@@ -1558,7 +1558,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                     <select
                       value={playbackSpeed}
                       onChange={(e) => changePlaybackSpeed(parseFloat(e.target.value))}
-                      className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm"
+                      className="dropdown"
                     >
                       <option value={0.25}>0.25x</option>
                       <option value={0.5}>0.5x</option>
@@ -2019,7 +2019,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         : 'bg-gray-800/50 border-gray-600/30'
                     } ${
                       draggedOperation === operation.id 
-                        ? 'opacity-50 scale-95' 
+                        ? 'opacity-50' 
                         : ''
                     } ${
                       dragOverIndex === index && draggedOperation !== operation.id
@@ -2126,8 +2126,6 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 {libraryFiles.map((file) => (
                   <motion.div
                     key={file.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                     onClick={() => selectVideoFromLibrary(file)}
                     className="p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
                   >
@@ -2308,7 +2306,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                   <select
                     value={textSettings.fontFamily}
                     onChange={(e) => setTextSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
-                    className="w-full input-field"
+                    className="dropdown"
                   >
                     <option value="Arial">Arial</option>
                     <option value="Times New Roman">Times New Roman</option>

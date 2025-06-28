@@ -216,8 +216,6 @@ const SettingsSection: React.FC = () => {
       case 'toggle':
         return (
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             onClick={() => updateSetting(setting.key, !value)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               value ? 'bg-lilac-500' : 'bg-gray-600'
@@ -234,12 +232,12 @@ const SettingsSection: React.FC = () => {
       case 'select':
         return (
           <select
-            value={value as string}
+            value={String(value)}
             onChange={(e) => updateSetting(setting.key, e.target.value)}
-            className="input-field"
+            className="w-full dropdown"
           >
-            {setting.options?.map((option: any) => (
-              <option key={option.value} value={option.value} className="bg-black-800 text-white">
+            {setting.options?.map((option: { value: string; label: string }) => (
+              <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
@@ -459,4 +457,4 @@ const SettingsSection: React.FC = () => {
   )
 }
 
-export default SettingsSection 
+export default SettingsSection

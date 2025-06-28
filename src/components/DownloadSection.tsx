@@ -142,10 +142,10 @@ const DownloadSection: React.FC = () => {
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
-                className="input-field w-full"
+                className="w-full dropdown"
               >
                 {formatOptions.map(option => (
-                  <option key={option.value} value={option.value} className="bg-gray-800 text-white">
+                  <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
@@ -176,8 +176,6 @@ const DownloadSection: React.FC = () => {
 
           {/* Download Button */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             onClick={handleDownload}
             disabled={!url.trim()}
             className="btn-primary w-full md:w-auto flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -265,4 +263,4 @@ const DownloadSection: React.FC = () => {
   )
 }
 
-export default DownloadSection 
+export default DownloadSection
