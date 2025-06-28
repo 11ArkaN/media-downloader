@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Film, Scissors, Volume2, Crop, Filter, Play, RotateCw, 
   Download, Upload, Pause, SkipBack, SkipForward, FileVideo,
-  Settings, MoreVertical, Maximize2, Minimize2, Music, Palette, Trash2,
+  MoreVertical, Maximize2, Minimize2, Music, Palette, Trash2,
   CheckCircle, AlertCircle, Info, X
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
@@ -547,17 +547,32 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
   const loadLibraryFiles = async () => {
     try {
       const files = await invoke('list_files', { directory: './downloads' }) as any[]
-      const videoFiles = files
-        .filter(file => ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(
-          file.name.split('.').pop()?.toLowerCase() || ''
-        ))
-        .map((file: any, index: number) => ({
-          id: `${index}`,
-          name: file.name,
-          path: file.path,
-          size: formatFileSize(file.size),
-          type: 'video'
-        }))
+      const videoFiles = await Promise.all(
+        files
+          .filter(file => ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(
+            file.name.split('.').pop()?.toLowerCase() || ''
+          ))
+          .map(async (file: any, index: number) => {
+            // Generate thumbnail for video
+            let thumbnail: string | undefined;
+            try {
+              thumbnail = await invoke('generate_thumbnail_data', {
+                filePath: file.path
+              }) as string;
+            } catch (error) {
+              console.warn('Failed to generate thumbnail for', file.name, error);
+            }
+
+            return {
+              id: `${index}`,
+              name: file.name,
+              path: file.path,
+              size: formatFileSize(file.size),
+              type: 'video',
+              thumbnail
+            };
+          })
+      );
       setLibraryFiles(videoFiles)
     } catch (error) {
       console.error('Error loading library files:', error)
@@ -1300,7 +1315,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 initial={{ opacity: 0, x: 300 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 300 }}
-                className="bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-lg p-4 min-w-80 shadow-xl"
+                className="glass-effect-strong rounded-lg p-4 min-w-80 shadow-xl border border-white/20"
               >
                 <div className="flex items-start space-x-3">
                   <ToastIcon type={toast.type} />
@@ -1310,7 +1325,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                   </div>
                   <button
                     onClick={() => removeToast(toast.id)}
-                    className="text-gray-400 hover:text-white"
+                    className="glass-button text-gray-400 hover:text-white p-1 rounded hover:scale-110 transition-all"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1338,24 +1353,22 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 {selectedFile ? mediaInfo?.filename || t('editSection.videoLibrary.loading') : t('editSection.videoLibrary.noVideoSelected')}
               </p>
             </div>
-        </div>
-
-          <div className="flex items-center space-x-2">
+        </div>          <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowLibrary(true)}
-              className="btn-secondary px-4 py-2 flex items-center space-x-2"
+              className="glass-button px-4 py-2 flex items-center space-x-2 hover:scale-105 transition-transform rounded-lg"
             >
               <FileVideo className="w-4 h-4" />
               <span>{t('editSection.videoLibrary.library')}</span>
             </button>
             <button
               onClick={selectVideoFile}
-              className="btn-primary px-4 py-2 flex items-center space-x-2"
+              className="glass-button px-4 py-2 flex items-center space-x-2 bg-gradient-to-br from-purple-500/80 to-purple-600/90 backdrop-blur-md border border-purple-400/30 hover:from-purple-400/80 hover:to-purple-500/90 hover:shadow-purple-500/25 hover:scale-105 transition-all rounded-lg"
             >
               <Upload className="w-4 h-4" />
               <span>{t('editSection.videoLibrary.import')}</span>
-              </button>
-            </div>
+            </button>
+          </div>
         </div>
       </motion.div>
 
@@ -1366,7 +1379,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="glass-effect rounded-2xl p-4"
+            className="glass-panel rounded-2xl p-4"
           >
             {/* Preview Window */}
             <div className="relative bg-black rounded-lg overflow-hidden aspect-video mb-4">
@@ -1459,7 +1472,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               {videoSrc && (
                 <button
                   onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="absolute top-4 right-4 p-2 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
+                  className="absolute top-4 right-4 glass-button p-2 rounded-lg hover:scale-110 transition-all"
                 >
                   {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
@@ -1473,21 +1486,21 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 <div className="flex items-center justify-center space-x-4">
                   <button 
                     onClick={skipBackward}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    className="glass-button p-2 rounded-lg hover:scale-110 transition-all"
                   >
                     <SkipBack className="w-5 h-5" />
                   </button>
                   
                   <button 
                     onClick={togglePlay}
-                    className="p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                    className="p-3 bg-gradient-to-br from-purple-500/80 to-purple-600/90 backdrop-blur-md border border-purple-400/30 hover:from-purple-400/80 hover:to-purple-500/90 rounded-lg transition-all glass-effect-strong hover:shadow-purple-500/50 hover:scale-110"
                   >
                     {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                   </button>
                   
                   <button 
                     onClick={skipForward}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    className="glass-button p-2 rounded-lg hover:scale-110 transition-all"
                   >
                     <SkipForward className="w-5 h-5" />
                   </button>
@@ -1536,12 +1549,15 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 </div>
 
                 {/* Additional Controls */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-between space-x-4">
+                  <div className="flex items-center space-x-6">
                     {/* Volume */}
                     <div className="flex items-center space-x-2">
-                      <button onClick={toggleMute}>
-                        <Volume2 className={`w-5 h-5 ${isMuted ? 'text-red-500' : ''}`} />
+                      <button 
+                        onClick={toggleMute}
+                        className="video-control-button w-10"
+                      >
+                        <Volume2 className={`w-8 h-8 ${isMuted ? 'text-red-500' : ''}`} />
                       </button>
                       <input
                         type="range"
@@ -1550,50 +1566,53 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         step="0.1"
                         value={isMuted ? 0 : volume}
                         onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                        className="w-20"
+                        className="w-20 slider"
                       />
                     </div>
 
                     {/* Speed */}
-                    <select
-                      value={playbackSpeed}
-                      onChange={(e) => changePlaybackSpeed(parseFloat(e.target.value))}
-                      className="dropdown"
-                    >
-                      <option value={0.25}>0.25x</option>
-                      <option value={0.5}>0.5x</option>
-                      <option value={1}>1x</option>
-                      <option value={1.25}>1.25x</option>
-                      <option value={1.5}>1.5x</option>
-                      <option value={2}>2x</option>
-                    </select>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400 text-sm min-w-[44px]">{t('editSection.tools.speed')}:</span>
+                      <select
+                        value={playbackSpeed}
+                        onChange={(e) => changePlaybackSpeed(parseFloat(e.target.value))}
+                        className="video-control-select min-w-[80px] text-sm"
+                      >
+                        <option value={0.25}>0.25x</option>
+                        <option value={0.5}>0.5x</option>
+                        <option value={1}>1x</option>
+                        <option value={1.25}>1.25x</option>
+                        <option value={1.5}>1.5x</option>
+                        <option value={2}>2x</option>
+                      </select>
+                    </div>
                   </div>
 
                   {/* Trim Controls */}
-                  <div className="flex items-center space-x-2 text-sm">
-                    <span>{t('editSection.controls.trim')}:</span>
+                  <div className="flex items-center space-x-3 text-sm">
+                    <span className="text-gray-400 min-w-[32px]">{t('editSection.controls.trim')}:</span>
                     <input
                       type="number"
                       value={Math.round(trimStart)}
                       onChange={(e) => setTrimStart(Number(e.target.value))}
-                      className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-1"
+                      className="video-control-input w-16 text-sm"
                       min="0"
                       max={duration}
                     />
-                    <span>{t('editSection.controls.to')}</span>
+                    <span className="text-gray-400 min-w-[20px] text-center">{t('editSection.controls.to')}</span>
                     <input
                       type="number"
                       value={Math.round(trimEnd)}
                       onChange={(e) => setTrimEnd(Number(e.target.value))}
-                      className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-1"
+                      className="video-control-input w-16 text-sm"
                       min="0"
                       max={duration}
                     />
                     <button
                       onClick={addTrimOperation}
-                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm"
+                      className="video-control-button hover:scale-105 transition-transform"
                     >
-                      Add Trim
+                      {t('editSection.tools.addTrim')}
                     </button>
                   </div>
                 </div>
@@ -1605,8 +1624,8 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
         {/* Tools Panel */}
         <div className="space-y-4">
           {/* Panel Tabs */}
-          <div className="glass-effect rounded-xl p-2">
-            <div className="grid grid-cols-2 gap-1">
+          <div className="glass-panel rounded-xl p-3">
+            <div className="grid grid-cols-2 gap-3">
               {[
                 { id: 'tools', label: t('editSection.panels.tools'), icon: Scissors },
                 { id: 'effects', label: t('editSection.panels.effects'), icon: Filter },
@@ -1618,13 +1637,13 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                   <button
                     key={panel.id}
                     onClick={() => setActivePanel(panel.id as any)}
-                    className={`p-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                       activePanel === panel.id
-                        ? 'bg-purple-600 text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        ? 'bg-gradient-to-br from-purple-500/80 to-purple-600/90 backdrop-blur-md border border-purple-400/30 text-white shadow-lg shadow-purple-500/25 scale-105'
+                        : 'text-gray-400 hover:text-white glass-button'
                     }`}
                   >
-                    <Icon className="w-4 h-4 mx-auto mb-1" />
+                    <Icon className="w-4 h-4 mx-auto mb-2" />
                     <div>{panel.label}</div>
                   </button>
                 )
@@ -1633,7 +1652,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
           </div>
 
           {/* Panel Content */}
-          <div className="glass-effect rounded-xl p-4">
+          <div className="glass-panel rounded-xl p-4">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activePanel}
@@ -1643,26 +1662,17 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 transition={{ duration: 0.2 }}
               >
                 {activePanel === 'tools' && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-white mb-3">{t('editSection.tools.title')}</h3>
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-white mb-4">{t('editSection.tools.title')}</h3>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <button
                         onClick={startVisualCrop}
                         disabled={!videoSrc}
-                        className="w-full btn-secondary py-2 flex items-center space-x-2"
+                        className="w-full glass-button flex items-center space-x-2 hover:scale-105 transition-transform rounded-lg"
                       >
                         <Crop className="w-4 h-4" />
                         <span>{t('editSection.tools.visualCrop')}</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => setShowCropModal(true)}
-                        disabled={!videoSrc}
-                        className="w-full btn-secondary py-1 text-sm flex items-center space-x-2 opacity-75"
-                      >
-                        <Settings className="w-3 h-3" />
-                        <span>{t('editSection.tools.manualCrop')}</span>
                       </button>
                     </div>
 
@@ -1672,13 +1682,13 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         <div className="flex space-x-2">
                           <button
                             onClick={addCropOperation}
-                            className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-1 px-3 rounded text-sm"
+                            className="flex-1 glass-button py-1 px-3 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg"
                           >
                             {t('editSection.tools.apply')}
                           </button>
                           <button
                             onClick={() => setShowCropOverlay(false)}
-                            className="flex-1 btn-secondary py-1 px-3 text-sm"
+                            className="flex-1 glass-button py-1 px-3 text-sm hover:scale-105 transition-transform rounded-lg"
                           >
                             {t('editSection.tools.cancel')}
                           </button>
@@ -1689,7 +1699,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                     <button
                       onClick={() => addRotateOperation(90)}
                       disabled={!videoSrc}
-                      className="w-full btn-secondary py-2 flex items-center space-x-2"
+                      className="w-full glass-button flex items-center space-x-2 hover:scale-105 transition-transform rounded-lg"
                     >
                       <RotateCw className="w-4 h-4" />
                       <span>{t('editSection.tools.rotate90')}</span>
@@ -1698,21 +1708,21 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                     <button
                       onClick={() => setShowTextModal(true)}
                       disabled={!videoSrc}
-                      className="w-full btn-secondary py-2 flex items-center space-x-2"
+                      className="w-full glass-button flex items-center space-x-2 hover:scale-105 transition-transform rounded-lg"
                     >
                       <Palette className="w-4 h-4" />
                       <span>{t('editSection.tools.addText')}</span>
                     </button>
 
-                    <div className="space-y-2">
-                      <label className="text-sm text-gray-400">{t('editSection.tools.speed')}</label>
-                      <div className="grid grid-cols-3 gap-1">
+                    <div className="space-y-3 mt-6">
+                      <label className="text-sm text-gray-400 font-medium">{t('editSection.tools.speed')}</label>
+                      <div className="grid grid-cols-3 gap-3">
                         {[0.5, 1, 2].map(speed => (
                           <button
                             key={speed}
                             onClick={() => addSpeedOperation(speed)}
                             disabled={!videoSrc}
-                            className="btn-secondary py-1 text-sm"
+                            className="glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                           >
                             {speed}x
                           </button>
@@ -1723,13 +1733,13 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 )}
 
                 {activePanel === 'effects' && (
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-white mb-3">{t('editSection.effects.title')}</h3>
+                  <div className="space-y-5">
+                    <h3 className="font-semibold text-white mb-4">{t('editSection.effects.title')}</h3>
                     
                     {/* Adjustable Effects */}
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm text-gray-300 mb-2">
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <label className="block text-sm text-gray-300 font-medium">
                           {t('editSection.effects.brightness')}: {effectSettings.brightness.toFixed(1)}
                         </label>
                         <div className="slider-container relative">
@@ -1750,42 +1760,38 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         <button
                           onClick={() => addFilterOperation('brightness', effectSettings.brightness)}
                           disabled={!videoSrc}
-                          className="w-full btn-secondary py-1 text-sm mt-1"
+                          className="w-full glass-button text-sm mt-3 rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.applyBrightness')}
                         </button>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm text-gray-300 mb-2">
+                      </div>                      <div className="space-y-3">
+                        <label className="block text-sm text-gray-300 font-medium">
                           {t('editSection.effects.contrast')}: {effectSettings.contrast.toFixed(1)}
                         </label>
                         <div className="slider-container relative">
                           <div 
                             className="slider-progress" 
                             style={{ width: `${(effectSettings.contrast / 3) * 100}%` }}
-                      ></div>
-                      <input
-                        type="range"
-                        min="0"
+                          ></div>
+                          <input
+                            type="range"
+                            min="0"
                             max="3"
                             step="0.1"
                             value={effectSettings.contrast}
                             onChange={(e) => setEffectSettings(prev => ({ ...prev, contrast: parseFloat(e.target.value) }))}
                             className="w-full slider"
-                      />
-                    </div>
+                          />
+                        </div>
                         <button
                           onClick={() => addFilterOperation('contrast', effectSettings.contrast)}
                           disabled={!videoSrc}
-                          className="w-full btn-secondary py-1 text-sm mt-1"
+                          className="w-full glass-button text-sm mt-3 rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.applyContrast')}
                         </button>
-                  </div>
-
-                      <div>
-                        <label className="block text-sm text-gray-300 mb-2">
+                      </div>                      <div className="space-y-3">
+                        <label className="block text-sm text-gray-300 font-medium">
                           {t('editSection.effects.saturation')}: {effectSettings.saturation.toFixed(1)}
                         </label>
                         <div className="slider-container relative">
@@ -1793,27 +1799,25 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                             className="slider-progress" 
                             style={{ width: `${(effectSettings.saturation / 3) * 100}%` }}
                           ></div>
-                      <input
-                        type="range"
-                        min="0"
+                          <input
+                            type="range"
+                            min="0"
                             max="3"
-                        step="0.1"
+                            step="0.1"
                             value={effectSettings.saturation}
                             onChange={(e) => setEffectSettings(prev => ({ ...prev, saturation: parseFloat(e.target.value) }))}
                             className="w-full slider"
-                      />
-                    </div>
+                          />
+                        </div>
                         <button
                           onClick={() => addFilterOperation('saturation', effectSettings.saturation)}
                           disabled={!videoSrc}
-                          className="w-full btn-secondary py-1 text-sm mt-1"
+                          className="w-full glass-button text-sm mt-3 rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.applySaturation')}
                         </button>
-                  </div>
-
-                      <div>
-                        <label className="block text-sm text-gray-300 mb-2">
+                      </div>                      <div className="space-y-3">
+                        <label className="block text-sm text-gray-300 font-medium">
                           {t('editSection.effects.blur')}: {effectSettings.blur.toFixed(1)}px
                         </label>
                         <div className="slider-container relative">
@@ -1830,18 +1834,16 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                             onChange={(e) => setEffectSettings(prev => ({ ...prev, blur: parseFloat(e.target.value) }))}
                             className="w-full slider"
                           />
-                </div>
+                        </div>
                         <button
                           onClick={() => addFilterOperation('blur', effectSettings.blur)}
                           disabled={!videoSrc}
-                          className="w-full btn-secondary py-1 text-sm mt-1"
+                          className="w-full glass-button text-sm mt-3 rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.applyBlur')}
                         </button>
-              </div>
-
-                      <div>
-                        <label className="block text-sm text-gray-300 mb-2">
+                      </div>                      <div className="space-y-3">
+                        <label className="block text-sm text-gray-300 font-medium">
                           {t('editSection.effects.sharpen')}: {effectSettings.sharpen.toFixed(1)}
                         </label>
                         <div className="slider-container relative">
@@ -1858,27 +1860,27 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                             onChange={(e) => setEffectSettings(prev => ({ ...prev, sharpen: parseFloat(e.target.value) }))}
                             className="w-full slider"
                           />
-                      </div>
+                        </div>
                         <button
                           onClick={() => addFilterOperation('sharpen', effectSettings.sharpen)}
                           disabled={!videoSrc}
-                          className="w-full btn-secondary py-1 text-sm mt-1"
+                          className="w-full glass-button text-sm mt-3 rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.applySharpen')}
                         </button>
                       </div>
-                      </div>
+                    </div>
 
-                    <hr className="border-gray-600" />
+                    <hr className="border-gray-600 my-6" />
                     
                     {/* Preset Effects */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-300 mb-2">{t('editSection.effects.presetEffects')}</h4>
-                      <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium text-gray-300">{t('editSection.effects.presetEffects')}</h4>
+                      <div className="grid grid-cols-2 gap-4">
                         <button
                           onClick={() => addFilterOperation('grayscale')}
                           disabled={!videoSrc}
-                          className="btn-secondary py-2 text-sm"
+                          className="glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.grayscale')}
                         </button>
@@ -1886,7 +1888,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         <button
                           onClick={() => addFilterOperation('sepia')}
                           disabled={!videoSrc}
-                          className="btn-secondary py-2 text-sm"
+                          className="glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.sepia')}
                         </button>
@@ -1894,7 +1896,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         <button
                           onClick={() => addFilterOperation('vintage')}
                           disabled={!videoSrc}
-                          className="btn-secondary py-2 text-sm"
+                          className="glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.vintage')}
                         </button>
@@ -1902,7 +1904,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         <button
                           onClick={() => addFilterOperation('invert')}
                           disabled={!videoSrc}
-                          className="btn-secondary py-2 text-sm"
+                          className="glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                         >
                           {t('editSection.effects.invert')}
                         </button>
@@ -1912,29 +1914,29 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 )}
 
                 {activePanel === 'audio' && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-white mb-3">{t('editSection.audio.title')}</h3>
+                  <div className="space-y-5">
+                    <h3 className="font-semibold text-white mb-4">{t('editSection.audio.title')}</h3>
                     
-                    <div className="space-y-2">
-                      <label className="text-sm text-gray-400">{t('editSection.audio.volume')}</label>
-                      <div className="grid grid-cols-3 gap-1">
+                    <div className="space-y-4">
+                      <label className="text-sm text-gray-400 font-medium">{t('editSection.audio.volume')}</label>
+                      <div className="grid grid-cols-3 gap-3">
                         {[0.5, 1, 2].map(vol => (
                           <button
                             key={vol}
                             onClick={() => addVolumeOperation(vol)}
                             disabled={!videoSrc}
-                            className="btn-secondary py-1 text-sm"
+                            className="glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                           >
                             {vol * 100}%
                           </button>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
                     </div>
 
                     <button
                       onClick={() => addVolumeOperation(0)}
                       disabled={!videoSrc}
-                      className="w-full btn-secondary py-2 text-sm"
+                      className="w-full glass-button text-sm rounded-lg hover:scale-105 transition-transform"
                     >
                       {t('editSection.audio.muteAudio')}
                     </button>
@@ -1942,35 +1944,35 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                 )}
 
                 {activePanel === 'export' && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-white mb-3">{t('editSection.export.title')}</h3>
+                  <div className="space-y-5">
+                    <h3 className="font-semibold text-white mb-4">{t('editSection.export.title')}</h3>
                     
-                    <div className="text-sm text-gray-400 mb-3">
+                    <div className="text-sm text-gray-400 mb-4">
                       {t('editSection.export.operationsReady', { count: editOperations.length })}
                     </div>
 
-                    <div className="space-y-2">
-                <button 
-                  onClick={exportVideo}
+                    <div className="space-y-4">
+                      <button 
+                        onClick={exportVideo}
                         disabled={!videoSrc || editOperations.length === 0 || isProcessing}
-                        className="w-full btn-primary py-3 flex items-center justify-center space-x-2"
-                >
-                  {isProcessing ? (
+                        className="w-full glass-button py-3 flex items-center justify-center space-x-2 bg-gradient-to-br from-purple-500/80 to-purple-600/90 backdrop-blur-md border border-purple-400/30 hover:from-purple-400/80 hover:to-purple-500/90 hover:shadow-purple-500/25 rounded-lg"
+                      >
+                        {isProcessing ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
+                        ) : (
                           <Download className="w-4 h-4" />
-                  )}
+                        )}
                         <span>{isProcessing ? `${Math.round(processingProgress)}%` : t('editSection.export.exportToFile')}</span>
-                </button>
+                      </button>
 
-                <button 
+                      <button 
                         onClick={exportToLibrary}
                         disabled={!videoSrc || editOperations.length === 0 || isProcessing}
-                        className="w-full btn-secondary py-3 flex items-center justify-center space-x-2"
-                >
+                        className="w-full glass-button py-3 flex items-center justify-center space-x-2 rounded-lg hover:scale-105 transition-transform"
+                      >
                         <FileVideo className="w-4 h-4" />
                         <span>{t('editSection.export.exportToLibrary')}</span>
-                </button>
+                      </button>
                     </div>
 
                     {isProcessing && (
@@ -1989,10 +1991,10 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
 
           {/* Operations List */}
           {editOperations.length > 0 && (
-            <div className="glass-effect rounded-xl p-4">
+            <div className="glass-panel rounded-xl p-4">
               <h3 className="font-semibold text-white mb-3">{t('editSection.editQueue.title')}</h3>
               <div 
-                className="space-y-2 max-h-64 overflow-y-auto"
+                className="space-y-3 max-h-64 overflow-y-auto hidden-scrollbar"
                 onDragOver={handleDragOver}
                 onDrop={(e) => {
                   e.preventDefault()
@@ -2036,18 +2038,16 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                           type="checkbox"
                           checked={operation.enabled}
                           onChange={() => toggleOperation(operation.id)}
-                          className="rounded"
                         />
                         <span className="text-sm font-medium capitalize">
-                          {operation.type}
+                          {t(`editSection.operationTypes.${operation.type}`)}
                         </span>
-                      </div>
-                      <button
+                      </div>                      <button
                         onClick={() => removeOperation(operation.id)}
-                        className="text-red-400 hover:text-red-300"
+                        className="glass-button p-1 text-red-400 hover:text-red-300 rounded-lg hover:scale-110 transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
-                </button>
+                      </button>
                     </div>
                                          <div className="text-xs text-gray-400 mt-1">
                        {operation.type === 'trim' && (
@@ -2062,27 +2062,27 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                        )}
                        {operation.type === 'filter' && (
                          <span className="capitalize">
-                           {operation.params.filterType} filter
+                           {operation.params.filterType} {t('editSection.operationDescriptions.filter')}
                          </span>
                        )}
                        {operation.type === 'volume' && (
                          <span>
-                           Volume: {Math.round(operation.params.level * 100)}%
+                           {t('editSection.operationDescriptions.volume')} {Math.round(operation.params.level * 100)}%
                          </span>
                        )}
                        {operation.type === 'speed' && (
                          <span>
-                           Speed: {operation.params.speed}x
+                           {t('editSection.operationDescriptions.speed')} {operation.params.speed}x
                          </span>
                        )}
                        {operation.type === 'rotate' && (
                          <span>
-                           Rotate: {operation.params.angle}°
+                           {t('editSection.operationDescriptions.rotate')} {operation.params.angle}°
                          </span>
                        )}
                        {operation.type === 'text' && (
                          <span>
-                           Text: "{operation.params.text}" at ({operation.params.x}, {operation.params.y})
+                           {t('editSection.operationDescriptions.text')} "{operation.params.text}" {t('editSection.operationDescriptions.at')} ({operation.params.x}, {operation.params.y})
                          </span>
                        )}
                      </div>
@@ -2110,47 +2110,72 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-900 rounded-2xl p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden"
+              className="glass-modal rounded-2xl p-8 w-full max-w-4xl max-h-[80vh] overflow-hidden"
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">{t('editSection.modal.videoLibrary.title')}</h2>
                 <button
                   onClick={() => setShowLibrary(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="glass-button p-2 text-gray-400 hover:text-white rounded-lg hover:scale-110 transition-all"
                 >
-                  ✕
+                  <X className="w-5 h-5" />
                 </button>
-                </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-96">
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto max-h-80 hidden-scrollbar p-6 -m-4">
                 {libraryFiles.map((file) => (
                   <motion.div
                     key={file.id}
                     onClick={() => selectVideoFromLibrary(file)}
-                    className="p-4 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
+                    className="glass-card p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/20 m-4"
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    layout
                   >
-                    <div className="aspect-video bg-gray-700 rounded mb-3 flex items-center justify-center">
-                      <FileVideo className="w-8 h-8 text-gray-400" />
+                    <div className="aspect-video glass-effect-subtle rounded-lg mb-3 overflow-hidden border border-white/10 relative">
+                      {file.thumbnail ? (
+                        <img
+                          src={file.thumbnail}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to icon if thumbnail fails to load
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const fallback = target.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={`w-full h-full flex items-center justify-center ${file.thumbnail ? 'absolute inset-0' : ''}`}
+                        style={{ display: file.thumbnail ? 'none' : 'flex' }}
+                      >
+                        <FileVideo className="w-8 h-8 text-purple-400" />
+                      </div>
+                      {/* Video play indicator */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
+                        <div className="bg-black/50 backdrop-blur-sm rounded-full p-2">
+                          <Play className="w-6 h-6 text-white fill-current" />
+                        </div>
+                      </div>
                     </div>
                     <h3 className="font-medium text-white text-sm mb-1 truncate">{file.name}</h3>
                     <p className="text-gray-400 text-xs">{file.size}</p>
-              </motion.div>
+                  </motion.div>
                 ))}
-        </div>
+              </div>
 
               {libraryFiles.length === 0 && (
-                <div className="text-center py-12 text-gray-400">
-                  <FileVideo className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <div className="glass-effect-subtle rounded-xl p-8 text-center py-12 text-gray-400 border border-white/10">
+                  <FileVideo className="w-16 h-16 mx-auto mb-4 opacity-50 text-purple-400" />
                   <p>{t('editSection.modal.videoLibrary.noVideosFound')}</p>
                 </div>
               )}
       </motion.div>
           </motion.div>
-        )}
-
-        {/* Crop Modal */}
+        )}        {/* Crop Modal */}
         {showCropModal && (
-      <motion.div
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2162,7 +2187,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-900 rounded-2xl p-6 w-full max-w-md"
+              className="glass-modal rounded-2xl p-6 w-full max-w-md"
             >
               <h3 className="text-xl font-bold text-white mb-4">{t('editSection.modal.cropSettings.title')}</h3>
               
@@ -2203,22 +2228,20 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                     className="w-full input-field"
                   />
             </div>
-          </div>
-
-              <div className="flex space-x-3 mt-6">
+          </div>              <div className="flex space-x-3 mt-6">
                 <button
                   onClick={() => setShowCropModal(false)}
-                  className="flex-1 btn-secondary py-2"
+                  className="flex-1 glass-button py-2 rounded-lg hover:scale-105 transition-transform"
                 >
                   {t('editSection.modal.cropSettings.cancel')}
                 </button>
                 <button
                   onClick={addCropOperation}
-                  className="flex-1 btn-primary py-2"
+                  className="flex-1 glass-button py-2 bg-gradient-to-br from-purple-500/80 to-purple-600/90 backdrop-blur-md border border-purple-400/30 hover:from-purple-400/80 hover:to-purple-500/90 text-white rounded-lg hover:scale-105 transition-transform"
                 >
                   {t('editSection.modal.cropSettings.applyCrop')}
                 </button>
-        </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -2237,7 +2260,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-900 rounded-2xl p-6 w-full max-w-md"
+              className="glass-modal rounded-2xl p-6 w-full max-w-md"
             >
               <h3 className="text-xl font-bold text-white mb-4">{t('editSection.modal.addText.title')}</h3>
               
@@ -2346,13 +2369,13 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={() => setShowTextModal(false)}
-                  className="flex-1 btn-secondary py-2"
+                  className="flex-1 glass-button py-2 rounded-lg hover:scale-105 transition-transform"
                 >
                   {t('editSection.modal.addText.cancel')}
                 </button>
                 <button
                   onClick={addTextOperation}
-                  className="flex-1 btn-primary py-2"
+                  className="flex-1 glass-button py-2 bg-gradient-to-br from-purple-500/80 to-purple-600/90 backdrop-blur-md border border-purple-400/30 hover:from-purple-400/80 hover:to-purple-500/90 text-white rounded-lg hover:scale-105 transition-transform"
                 >
                   {t('editSection.modal.addText.addText')}
                 </button>

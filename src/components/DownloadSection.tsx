@@ -127,7 +127,7 @@ const DownloadSection: React.FC = () => {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder={t('download_section.url_placeholder')}
-                className="input-field w-full pl-12"
+                className="input-field w-full pl-14"
                 onKeyPress={(e) => e.key === 'Enter' && handleDownload()}
               />
             </div>
@@ -166,7 +166,7 @@ const DownloadSection: React.FC = () => {
                 />
                 <button
                   onClick={selectOutputPath}
-                  className="btn-secondary px-4"
+                  className="glass-button px-4 py-3 rounded-lg hover:scale-105 transition-transform"
                 >
                   <FolderOpen className="w-5 h-5" />
                 </button>
@@ -178,7 +178,9 @@ const DownloadSection: React.FC = () => {
           <motion.button
             onClick={handleDownload}
             disabled={!url.trim()}
-            className="btn-primary w-full md:w-auto flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="btn-primary w-full md:w-auto flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed glass-effect-strong hover:shadow-purple-500/25"
           >
             <Download className="w-5 h-5" />
             <span>{t('download_section.start_download_button')}</span>
@@ -207,7 +209,7 @@ const DownloadSection: React.FC = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-gray-800/50 rounded-xl p-4 border border-white/10"
+                className="glass-card rounded-xl p-4 hover:scale-[1.02] transition-all duration-300"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">

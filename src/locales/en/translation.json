@@ -130,6 +130,10 @@
       "size": "Size",
       "type": "Type"
     },
+    "sort_order": {
+      "desc": "Newest First",
+      "asc": "Oldest First"
+    },
     "filter_options": {
       "all": "All",
       "video": "Videos",
@@ -163,7 +167,9 @@
     "and_more_files": "...and {{count}} more files",
     "cancel": "Cancel",
     "delete_file": "Delete",
-    "delete_files": "Delete {{count}} Files"
+    "delete_files": "Delete {{count}} Files",
+    "show_in_folder": "Show in Folder",
+    "failed_to_start_video_player": "Failed to start video player."
   },
   "editSection": {
     "videoLibrary": {
@@ -189,6 +195,7 @@
       "cancel": "Cancel",
       "rotate90": "Rotate 90°",
       "addText": "Add Text",
+      "addTrim": "Add Trim",
       "speed": "Speed"
     },
     "effects": {
@@ -342,6 +349,24 @@
         "title": "Export to Library Started",
         "message": "Video will be saved to your library..."
       }
+    },
+    "operationDescriptions": {
+      "filter": "filter",
+      "volume": "Volume:",
+      "speed": "Speed:",
+      "rotate": "Rotate:",
+      "text": "Text:",
+      "at": "at"
+    },
+    "operationTypes": {
+      "trim": "Trim",
+      "crop": "Crop", 
+      "volume": "Volume",
+      "filter": "Filter",
+      "rotate": "Rotate",
+      "speed": "Speed",
+      "fade": "Fade",
+      "text": "Text"
     }
   }
 } 

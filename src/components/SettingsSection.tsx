@@ -217,13 +217,17 @@ const SettingsSection: React.FC = () => {
         return (
           <motion.button
             onClick={() => updateSetting(setting.key, !value)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              value ? 'bg-lilac-500' : 'bg-gray-600'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
+              value 
+                ? 'bg-gradient-to-r from-purple-500/80 to-pink-500/80 backdrop-blur-md border border-purple-400/30 shadow-lg shadow-purple-500/25' 
+                : 'bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 hover:border-white/30'
             }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                value ? 'translate-x-6' : 'translate-x-1'
+              className={`inline-block h-4 w-4 transform rounded-full transition-all duration-300 ${
+                value 
+                  ? 'translate-x-6 bg-white shadow-lg shadow-purple-500/30' 
+                  : 'translate-x-1 bg-white/90 backdrop-blur-sm'
               }`}
             />
           </motion.button>
@@ -268,7 +272,7 @@ const SettingsSection: React.FC = () => {
             />
             <button 
               onClick={() => selectPath(setting.key)}
-              className="btn-secondary px-4"
+              className="glass-button px-4 py-3 rounded-lg hover:scale-105 transition-transform"
             >
               <Folder className="w-4 h-4" />
             </button>
@@ -311,7 +315,7 @@ const SettingsSection: React.FC = () => {
             <button
               onClick={checkDependencies}
               disabled={isCheckingDeps}
-              className="btn-secondary flex items-center space-x-2"
+              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg hover:scale-105 transition-transform"
             >
               <Shield className={`w-4 h-4 ${isCheckingDeps ? 'animate-spin' : ''}`} />
               <span>{isCheckingDeps ? t('settings.dependencies.checking_button') : t('settings.dependencies.check_button')}</span>
@@ -320,7 +324,7 @@ const SettingsSection: React.FC = () => {
             <button
               onClick={saveSettings}
               disabled={isSaving}
-              className="btn-primary flex items-center space-x-2"
+              className="btn-primary flex items-center space-x-2 glass-effect-strong hover:shadow-purple-500/25"
             >
               {isSaving ? (
                 <>

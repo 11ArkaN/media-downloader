@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Download, Film, Settings, Folder } from 'lucide-react'
 import './App.css'
@@ -12,6 +12,16 @@ function App() {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<ActiveTab>('download')
   const [selectedVideoFile, setSelectedVideoFile] = useState<string>('')
+
+  useEffect(() => {
+    const handleContextmenu = (e: MouseEvent) => {
+      e.preventDefault()
+    }
+    document.addEventListener('contextmenu', handleContextmenu)
+    return function cleanup() {
+      document.removeEventListener('contextmenu', handleContextmenu)
+    }
+  }, [])
 
   const tabVariants = {
     inactive: { scale: 0.95, opacity: 0.7 },
@@ -56,7 +66,7 @@ function App() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <div className="glass-effect rounded-2xl p-6">
+            <div className="glass-effect-strong rounded-2xl p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-lilac-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -86,7 +96,7 @@ function App() {
             transition={{ delay: 0.1 }}
             className="mb-8"
           >
-            <div className="glass-effect rounded-2xl p-2">
+            <div className="glass-nav rounded-2xl p-2">
               <div className="flex space-x-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon
@@ -101,8 +111,8 @@ function App() {
                       className={`
                       flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold transition-all duration-300
                       ${activeTab === tab.id
-                          ? `bg-gradient-to-r ${tab.color} text-white shadow-lg shadow-${tab.id === 'download' ? 'lilac' : tab.id === 'edit' ? 'purple' : tab.id === 'files' ? 'blue' : 'gray'}-500/25`
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          ? `bg-gradient-to-r ${tab.color} text-white shadow-lg shadow-${tab.id === 'download' ? 'lilac' : tab.id === 'edit' ? 'purple' : tab.id === 'files' ? 'blue' : 'gray'}-500/25 scale-105`
+                          : 'text-gray-400 hover:text-white glass-button'
                         }
                     `}
                     >

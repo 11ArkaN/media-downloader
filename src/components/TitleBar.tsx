@@ -11,7 +11,7 @@ const TitleBar = () => {
   const closeWindow = () => appWindow.close();
 
   return (
-    <div data-tauri-drag-region className="glass-effect fixed top-0 left-0 right-0 h-10 flex justify-between items-center select-none z-50 px-2 border-b border-white/10">
+    <div data-tauri-drag-region className="glass-effect fixed top-0 left-0 right-0 h-10 flex justify-between items-center select-none z-[100] px-2 border-b border-white/10">
       <div className="flex items-center space-x-2">
         <div className="w-8 h-8 bg-gradient-to-r from-lilac-500 to-purple-600 rounded-lg flex items-center justify-center">
           <Download className="w-4 h-4 text-white" />

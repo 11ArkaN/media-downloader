@@ -130,6 +130,10 @@
       "size": "Rozmiar",
       "type": "Typ"
     },
+    "sort_order": {
+      "desc": "Najnowsze pierwsze",
+      "asc": "Najstarsze pierwsze"
+    },
     "filter_options": {
       "all": "Wszystkie",
       "video": "Wideo",
@@ -163,7 +167,9 @@
     "and_more_files": "...i {{count}} więcej plików",
     "cancel": "Anuluj",
     "delete_file": "Usuń",
-    "delete_files": "Usuń {{count}} Plików"
+    "delete_files": "Usuń {{count}} Plików",
+    "show_in_folder": "Pokaż w folderze",
+    "failed_to_start_video_player": "Nie udało się uruchomić odtwarzacza wideo."
   },
   "editSection": {
     "videoLibrary": {
@@ -182,13 +188,13 @@
     },
     "tools": {
       "title": "Narzędzia edycji",
-      "visualCrop": "Kadrowanie wizualne",
-      "manualCrop": "Kadrowanie manualne",
+      "visualCrop": "Kadrowanie",
       "cropInstructions": "Przeciągnij, aby przenieść, rogi aby zmienić rozmiar",
       "apply": "Zastosuj",
       "cancel": "Anuluj",
       "rotate90": "Obróć o 90°",
       "addText": "Dodaj tekst",
+      "addTrim": "Dodaj przycinanie",
       "speed": "Prędkość"
     },
     "effects": {
@@ -342,6 +348,24 @@
         "title": "Rozpoczęto eksport do biblioteki",
         "message": "Wideo zostanie zapisane w bibliotece..."
       }
+    },
+    "operationDescriptions": {
+      "filter": "filtr",
+      "volume": "Głośność:",
+      "speed": "Prędkość:",
+      "rotate": "Obrót:",
+      "text": "Tekst:",
+      "at": "w"
+    },
+    "operationTypes": {
+      "trim": "Przycinanie",
+      "crop": "Kadrowanie",
+      "volume": "Głośność",
+      "filter": "Filtr",
+      "rotate": "Obrót",
+      "speed": "Prędkość",
+      "fade": "Zanikanie",
+      "text": "Tekst"
     }
   }
 } 
