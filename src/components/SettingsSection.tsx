@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Settings, Download, Folder, Monitor, Shield, Zap, Check, X, AlertCircle } from 'lucide-react'
+import { Settings, Download, Folder, Monitor, Shield, Zap, Check, X, AlertCircle, RefreshCw, Eye } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next'
 interface DependencyInfo {
   ytdlp: string
   ffmpeg: string
+  ytdlp_installed: boolean
+  ffmpeg_installed: boolean
 }
 
 const SettingsSection: React.FC = () => {
@@ -33,6 +35,9 @@ const SettingsSection: React.FC = () => {
   const [dependencies, setDependencies] = useState<DependencyInfo | null>(null)
   const [isCheckingDeps, setIsCheckingDeps] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isInstallingDeps, setIsInstallingDeps] = useState(false)
+  const [installationLogs, setInstallationLogs] = useState<string>('')
+  const [showLogs, setShowLogs] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -100,11 +105,39 @@ const SettingsSection: React.FC = () => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
-  const getDependencyStatus = (version: string) => {
-    if (version === 'Not found') {
+  const getDependencyStatus = (version: string, installed: boolean) => {
+    if (version === 'Not found' || !installed) {
       return { icon: X, color: 'text-red-400', bg: 'bg-red-500/20' }
     }
     return { icon: Check, color: 'text-green-400', bg: 'bg-green-500/20' }
+  }
+
+  const forceInstallDependencies = async () => {
+    setIsInstallingDeps(true)
+    try {
+      // Clear the dependency cache to force a fresh check
+      localStorage.removeItem('dependency-check-status')
+      localStorage.removeItem('dependency-check-time')
+      
+      await invoke('install_dependencies')
+      await checkDependencies()
+    } catch (error) {
+      console.error('Error installing dependencies:', error)
+    } finally {
+      setIsInstallingDeps(false)
+    }
+  }
+
+  const getInstallationLogs = async () => {
+    try {
+      const logs = await invoke('get_installation_logs') as string
+      setInstallationLogs(logs)
+      setShowLogs(true)
+    } catch (error) {
+      console.error('Error getting installation logs:', error)
+      setInstallationLogs(`Error getting logs: ${error}`)
+      setShowLogs(true)
+    }
   }
 
   const settingSections = [
@@ -362,7 +395,7 @@ const SettingsSection: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  const status = getDependencyStatus(dependencies.ytdlp)
+                  const status = getDependencyStatus(dependencies.ytdlp, dependencies.ytdlp_installed)
                   const Icon = status.icon
                   return (
                     <>
@@ -385,7 +418,7 @@ const SettingsSection: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  const status = getDependencyStatus(dependencies.ffmpeg)
+                  const status = getDependencyStatus(dependencies.ffmpeg, dependencies.ffmpeg_installed)
                   const Icon = status.icon
                   return (
                     <>
@@ -402,7 +435,26 @@ const SettingsSection: React.FC = () => {
             </div>
           </div>
 
-          {(dependencies.ytdlp === 'Not found' || dependencies.ffmpeg === 'Not found') && (
+          <div className="mt-4 flex space-x-3">
+            <button
+              onClick={forceInstallDependencies}
+              disabled={isInstallingDeps}
+              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+            >
+              <RefreshCw className={`w-4 h-4 ${isInstallingDeps ? 'animate-spin' : ''}`} />
+              <span>{isInstallingDeps ? t('settings.debug.installing_button') : t('settings.debug.force_install_button')}</span>
+            </button>
+            
+            <button
+              onClick={getInstallationLogs}
+              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+            >
+              <Eye className="w-4 h-4" />
+              <span>{t('settings.debug.view_logs_button')}</span>
+            </button>
+          </div>
+
+          {(!dependencies.ytdlp_installed || !dependencies.ffmpeg_installed) && (
             <div className="mt-4 p-4 bg-orange-500/20 border border-orange-500/30 rounded-lg">
               <div className="flex items-start space-x-3">
                 <AlertCircle className="w-5 h-5 text-orange-400 mt-0.5" />
@@ -415,6 +467,44 @@ const SettingsSection: React.FC = () => {
               </div>
             </div>
           )}
+        </motion.div>
+      )}
+
+      {/* Debug Logs Modal */}
+      {showLogs && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowLogs(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-800 rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">{t('settings.debug.logs_modal_title')}</h3>
+              <button
+                onClick={() => setShowLogs(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <pre className="bg-gray-900 p-4 rounded-lg text-green-400 text-sm overflow-auto max-h-96 whitespace-pre-wrap">
+              {installationLogs || t('settings.debug.no_logs_available')}
+            </pre>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowLogs(false)}
+                className="btn-primary"
+              >
+                {t('settings.debug.logs_modal_close')}
+              </button>
+            </div>
+          </motion.div>
         </motion.div>
       )}
 
@@ -457,6 +547,68 @@ const SettingsSection: React.FC = () => {
           </motion.div>
         )
       })}
+
+      {/* Debug Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-effect rounded-2xl p-8"
+      >
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-red-700 rounded-lg flex items-center justify-center">
+            <Eye className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="text-xl font-bold text-white">{t('settings.debug.title')}</h3>
+        </div>
+
+        <div className="space-y-4">
+          <button
+            onClick={forceInstallDependencies}
+            disabled={isInstallingDeps}
+            className="btn-primary flex items-center space-x-2 w-full glass-effect-strong hover:shadow-red-500/25"
+          >
+            {isInstallingDeps ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            <span>{t('settings.debug.force_install_button')}</span>
+          </button>
+
+          <button
+            onClick={getInstallationLogs}
+            className="glass-button flex items-center space-x-2 w-full px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+          >
+            <Eye className="w-4 h-4" />
+            <span>{t('settings.debug.view_logs_button')}</span>
+          </button>
+        </div>
+
+        {/* Installation Logs Modal */}
+        {showLogs && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          >
+            <div className="bg-gray-900 rounded-lg shadow-lg max-w-lg w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold text-white">{t('settings.debug.installation_logs')}</h4>
+                <button
+                  onClick={() => setShowLogs(false)}
+                  className="text-gray-400 hover:text-gray-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <pre className="text-sm text-gray-200 whitespace-pre-wrap break-words">
+                {installationLogs}
+              </pre>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   )
 }

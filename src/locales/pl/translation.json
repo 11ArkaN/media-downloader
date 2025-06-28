@@ -16,6 +16,15 @@
       "missing_dependencies": "Brakujące zależności",
       "missing_dependencies_description": "Brakuje niektórych zależności. Zainstaluj je, aby uzyskać pełną funkcjonalność."
     },
+    "debug": {
+      "title": "Narzędzia debugowania",
+      "force_install_button": "Wymuś instalację zależności",
+      "installing_button": "Instalowanie...",
+      "view_logs_button": "Wyświetl logi debugowania",
+      "logs_modal_title": "Logi debugowania instalacji",
+      "logs_modal_close": "Zamknij",
+      "no_logs_available": "Brak dostępnych logów"
+    },
     "sections": {
       "download": {
         "title": "Ustawienia pobierania",

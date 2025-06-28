@@ -1,25 +1,94 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Download, Film, Settings, Folder } from 'lucide-react'
+import { Download, Film, Settings, Folder, Loader } from 'lucide-react'
 import './App.css'
 import { DownloadSection, EditSection, SettingsSection, FileExplorer } from './components'
 import TitleBar from './components/TitleBar'
 import { useTranslation } from 'react-i18next'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 type ActiveTab = 'download' | 'edit' | 'files' | 'settings'
+
+function DependencyInstaller({ message }: { message: string }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50">
+      <Loader className="w-16 h-16 text-white animate-spin mb-4" />
+      <p className="text-white text-xl">{message}</p>
+    </div>
+  )
+}
 
 function App() {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<ActiveTab>('download')
   const [selectedVideoFile, setSelectedVideoFile] = useState<string>('')
+  const [installMessage, setInstallMessage] = useState('Checking dependencies...')
+  const [showDependencyOverlay, setShowDependencyOverlay] = useState(true)
 
   useEffect(() => {
     const handleContextmenu = (e: MouseEvent) => {
       e.preventDefault()
     }
     document.addEventListener('contextmenu', handleContextmenu)
+
+    const unlisten = listen<string>('dependency-install-progress', (event) => {
+      setInstallMessage(event.payload)
+    })
+
+    // Check localStorage immediately to see if we can skip the entire process
+    const dependencyStatus = localStorage.getItem('dependency-check-status')
+    const lastCheckTime = localStorage.getItem('dependency-check-time')
+    const currentTime = Date.now()
+    
+    // If we have a valid cached status within 24 hours, use it
+    if (dependencyStatus === 'installed' && lastCheckTime) {
+      const timeSinceLastCheck = currentTime - parseInt(lastCheckTime)
+      const twentyFourHours = 24 * 60 * 60 * 1000
+      
+      if (timeSinceLastCheck < twentyFourHours) {
+        // Use cached data - no need to check backend
+        console.log('Using cached dependency status - skipping backend check')
+        setShowDependencyOverlay(false)
+        setInstallMessage('Dependencies verified from cache')
+        
+        // Set up cleanup and return early
+        return function cleanup() {
+          document.removeEventListener('contextmenu', handleContextmenu)
+          unlisten.then(f => f())
+        }
+      }
+    }
+
+    // Only define and call checkAndInstall if we need to actually check
+    const checkAndInstall = async () => {
+      try {
+        setInstallMessage('Checking dependencies...')
+        const deps = await invoke<{ ytdlp_installed: boolean, ffmpeg_installed: boolean }>('check_dependencies')
+        
+        if (deps.ytdlp_installed && deps.ffmpeg_installed) {
+          localStorage.setItem('dependency-check-status', 'installed')
+          localStorage.setItem('dependency-check-time', currentTime.toString())
+        } else {
+          setInstallMessage('Installing missing dependencies...')
+          await invoke('install_dependencies')
+          localStorage.setItem('dependency-check-status', 'installed')
+          localStorage.setItem('dependency-check-time', currentTime.toString())
+        }
+      } catch (error) {
+        console.error("Failed to install dependencies:", error)
+        setInstallMessage('Error installing dependencies. Please check the logs.')
+        localStorage.setItem('dependency-check-status', 'error')
+      } finally {
+        setShowDependencyOverlay(false)
+      }
+    }
+
+    checkAndInstall()
+
     return function cleanup() {
       document.removeEventListener('contextmenu', handleContextmenu)
+      unlisten.then(f => f())
     }
   }, [])
 
@@ -58,6 +127,7 @@ function App() {
   return (
     <>
       <TitleBar />
+      {showDependencyOverlay && <DependencyInstaller message={installMessage} />}
       <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-purple-950/20 p-6 pt-16">
         <div className="max-w-7xl mx-auto">
           {/* Header */}

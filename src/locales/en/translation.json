@@ -16,6 +16,15 @@
       "missing_dependencies": "Missing Dependencies",
       "missing_dependencies_description": "Some dependencies are missing. Please install them for full functionality."
     },
+    "debug": {
+      "title": "Debug Tools",
+      "force_install_button": "Force Install Dependencies",
+      "installing_button": "Installing...",
+      "view_logs_button": "View Debug Logs",
+      "logs_modal_title": "Installation Debug Logs",
+      "logs_modal_close": "Close",
+      "no_logs_available": "No logs available"
+    },
     "sections": {
       "download": {
         "title": "Download Settings",

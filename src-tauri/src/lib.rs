@@ -2,7 +2,7 @@ use http_range::HttpRange;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::path::PathBuf;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use anyhow::Result;
 use uuid::Uuid;
 use std::sync::{Arc, LazyLock};
@@ -10,6 +10,38 @@ use tokio::sync::Mutex;
 use warp::Filter;
 use warp::http::{header, StatusCode};
 use base64::{Engine as _, engine::general_purpose};
+use reqwest::Client;
+use std::fs::{self, File};
+use std::io::copy;
+use zip::ZipArchive;
+
+fn create_hidden_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    
+    // Hide command window on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    
+    cmd
+}
+
+fn create_hidden_command_with_path(path: &std::path::Path) -> Command {
+    let mut cmd = Command::new(path);
+    
+    // Hide command window on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    
+    cmd
+}
+
+const GITHUB_API_URL: &str = "https://api.github.com/repos/";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadRequest {
@@ -48,6 +80,17 @@ pub struct MediaInfo {
     pub resolution: Option<String>,
     pub format: String,
     pub size: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReleaseAsset {
+    pub name: String,
+    pub browser_download_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GithubRelease {
+    pub assets: Vec<ReleaseAsset>,
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -94,8 +137,14 @@ async fn execute_download(
     download_id: String,
     request: DownloadRequest,
 ) -> Result<()> {
-    let mut cmd = Command::new("yt-dlp");
-    
+    let ytdlp_cmd = get_yt_dlp_command();
+    let mut cmd = if ytdlp_cmd == "managed" {
+        let ytdlp_path = get_yt_dlp_path(&app);
+        create_hidden_command_with_path(&ytdlp_path)
+    } else {
+        create_hidden_command("yt-dlp")
+    };
+
     cmd.arg("--format")
         .arg(&request.format)
         .arg("--output")
@@ -150,8 +199,15 @@ async fn execute_download(
 }
 
 #[tauri::command]
-async fn get_video_info(file_path: String) -> Result<MediaInfo, String> {
-    let mut cmd = Command::new("ffprobe");
+async fn get_video_info(app: tauri::AppHandle, file_path: String) -> Result<MediaInfo, String> {
+    let ffprobe_cmd = get_ffprobe_command();
+    let mut cmd = if ffprobe_cmd == "managed" {
+        let ffprobe_path = get_ffprobe_path(&app);
+        create_hidden_command_with_path(&ffprobe_path)
+    } else {
+        create_hidden_command("ffprobe")
+    };
+
     cmd.arg("-v")
         .arg("quiet")
         .arg("-print_format")
@@ -251,8 +307,14 @@ async fn execute_video_processing(
     process_id: String,
     request: EditRequest,
 ) -> Result<()> {
-    let mut cmd = Command::new("ffmpeg");
-    
+    let ffmpeg_cmd = get_ffmpeg_command();
+    let mut cmd = if ffmpeg_cmd == "managed" {
+        let ffmpeg_path = get_ffmpeg_path(&app);
+        create_hidden_command_with_path(&ffmpeg_path)
+    } else {
+        create_hidden_command("ffmpeg")
+    };
+
     // Disable fontconfig to avoid configuration errors on Windows
     cmd.env("FONTCONFIG_FILE", "");
     cmd.env("FONTCONFIG_PATH", "");
@@ -786,35 +848,185 @@ struct ServerError;
 impl warp::reject::Reject for ServerError {}
 
 #[tauri::command]
-async fn check_dependencies() -> Result<serde_json::Value, String> {
+async fn check_dependencies(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let ytdlp_path = get_yt_dlp_path(&app);
+    let ffmpeg_path = get_ffmpeg_path(&app);
+
+    // Check if dependencies are available system-wide first
     let mut ytdlp_version = "Not found".to_string();
     let mut ffmpeg_version = "Not found".to_string();
+    let mut ytdlp_installed = false;
+    let mut ffmpeg_installed = false;
 
-    // Check yt-dlp
-    if let Ok(output) = Command::new("yt-dlp").arg("--version").output() {
+    // Check yt-dlp (system-wide first, then managed)
+    if let Ok(output) = create_hidden_command("yt-dlp").arg("--version").output() {
         if output.status.success() {
-            ytdlp_version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            ytdlp_version = format!("System: {}", String::from_utf8_lossy(&output.stdout).trim());
+            ytdlp_installed = true;
+        }
+    } else if ytdlp_path.exists() {
+        if let Ok(output) = create_hidden_command_with_path(&ytdlp_path).arg("--version").output() {
+            if output.status.success() {
+                ytdlp_version = format!("Managed: {}", String::from_utf8_lossy(&output.stdout).trim());
+                ytdlp_installed = true;
+            }
         }
     }
 
-    // Check ffmpeg
-    if let Ok(output) = Command::new("ffmpeg").arg("-version").output() {
+    // Check ffmpeg (system-wide first, then managed)
+    if let Ok(output) = create_hidden_command("ffmpeg").arg("-version").output() {
         if output.status.success() {
             let output_str = String::from_utf8_lossy(&output.stdout);
             if let Some(line) = output_str.lines().next() {
-                ffmpeg_version = line.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Unknown").to_string();
+                let version = line.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Unknown").to_string();
+                ffmpeg_version = format!("System: {}", version);
+                ffmpeg_installed = true;
+            }
+        }
+    } else if ffmpeg_path.exists() {
+        if let Ok(output) = create_hidden_command_with_path(&ffmpeg_path).arg("-version").output() {
+            if output.status.success() {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                if let Some(line) = output_str.lines().next() {
+                    let version = line.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Unknown").to_string();
+                    ffmpeg_version = format!("Managed: {}", version);
+                    ffmpeg_installed = true;
+                }
             }
         }
     }
 
     Ok(serde_json::json!({
         "ytdlp": ytdlp_version,
-        "ffmpeg": ffmpeg_version
+        "ffmpeg": ffmpeg_version,
+        "ytdlp_installed": ytdlp_installed,
+        "ffmpeg_installed": ffmpeg_installed
     }))
 }
 
 #[tauri::command]
-async fn generate_thumbnail_data(file_path: String) -> Result<String, String> {
+async fn install_dependencies(app: tauri::AppHandle) -> Result<(), String> {
+    let app_dir = get_app_dir(&app);
+    if !app_dir.exists() {
+        fs::create_dir_all(&app_dir).map_err(|e| format!("Failed to create app directory: {}", e))?;
+    }
+
+    // Check if yt-dlp is available system-wide first
+    let ytdlp_available = create_hidden_command("yt-dlp").arg("--version").output().is_ok();
+    if !ytdlp_available {
+        let ytdlp_path = get_yt_dlp_path(&app);
+        if !ytdlp_path.exists() {
+            app.emit("dependency-install-progress", "Downloading yt-dlp...").map_err(|e| e.to_string())?;
+            
+            match get_latest_release_assets("yt-dlp/yt-dlp").await {
+                Ok(release) => {
+                    if let Some(asset) = release.assets.iter().find(|a| a.name == "yt-dlp.exe") {
+                        match download_file(&asset.browser_download_url, &ytdlp_path).await {
+                            Ok(_) => {
+                                app.emit("dependency-install-progress", "yt-dlp downloaded successfully").map_err(|e| e.to_string())?;
+                            }
+                            Err(e) => {
+                                return Err(format!("Failed to download yt-dlp: {}", e));
+                            }
+                        }
+                    } else {
+                        return Err("Could not find yt-dlp.exe in the latest release".to_string());
+                    }
+                }
+                Err(e) => {
+                    return Err(format!("Failed to get yt-dlp release info: {}", e));
+                }
+            }
+        } else {
+            app.emit("dependency-install-progress", "yt-dlp already installed (managed)").map_err(|e| e.to_string())?;
+        }
+    } else {
+        app.emit("dependency-install-progress", "yt-dlp already installed (system)").map_err(|e| e.to_string())?;
+    }
+
+    // Check if ffmpeg is available system-wide first
+    let ffmpeg_available = create_hidden_command("ffmpeg").arg("-version").output().is_ok();
+    if !ffmpeg_available {
+        let ffmpeg_path = get_ffmpeg_path(&app);
+        if !ffmpeg_path.exists() {
+            app.emit("dependency-install-progress", "Downloading ffmpeg...").map_err(|e| e.to_string())?;
+            
+            // Try to download from multiple sources
+            let mut ffmpeg_installed = false;
+            
+            // First try: GyanD/codexffmpeg
+            match get_latest_release_assets("GyanD/codexffmpeg").await {
+                Ok(release) => {
+                    if let Some(asset) = release.assets.iter().find(|a| a.name.contains("essentials_build.zip")) {
+                        let zip_path = app_dir.join(&asset.name);
+                        match download_file(&asset.browser_download_url, &zip_path).await {
+                            Ok(_) => {
+                                app.emit("dependency-install-progress", "Extracting ffmpeg...").map_err(|e| e.to_string())?;
+                                match extract_zip(&zip_path, &app_dir) {
+                                    Ok(_) => {
+                                        let _ = fs::remove_file(zip_path);
+                                        ffmpeg_installed = true;
+                                        app.emit("dependency-install-progress", "ffmpeg extracted successfully").map_err(|e| e.to_string())?;
+                                    }
+                                    Err(e) => {
+                                        app.emit("dependency-install-progress", &format!("Failed to extract ffmpeg: {}", e)).map_err(|e| e.to_string())?;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                app.emit("dependency-install-progress", &format!("Failed to download ffmpeg: {}", e)).map_err(|e| e.to_string())?;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    app.emit("dependency-install-progress", &format!("Failed to get ffmpeg release info: {}", e)).map_err(|e| e.to_string())?;
+                }
+            }
+            
+            // Second try: Direct download from a static URL if the above fails
+            if !ffmpeg_installed {
+                app.emit("dependency-install-progress", "Downloading ffmpeg from alternative source...").map_err(|e| e.to_string())?;
+                let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+                let zip_path = app_dir.join("ffmpeg-essentials.zip");
+                
+                match download_file(ffmpeg_url, &zip_path).await {
+                    Ok(_) => {
+                        app.emit("dependency-install-progress", "Extracting ffmpeg...").map_err(|e| e.to_string())?;
+                        match extract_zip(&zip_path, &app_dir) {
+                            Ok(_) => {
+                                let _ = fs::remove_file(zip_path);
+                                ffmpeg_installed = true;
+                                app.emit("dependency-install-progress", "ffmpeg extracted successfully").map_err(|e| e.to_string())?;
+                            }
+                            Err(e) => {
+                                app.emit("dependency-install-progress", &format!("Failed to extract ffmpeg: {}", e)).map_err(|e| e.to_string())?;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        app.emit("dependency-install-progress", &format!("Failed to download ffmpeg from alternative source: {}", e)).map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+            
+            if !ffmpeg_installed {
+                return Err("Failed to install ffmpeg from all available sources".to_string());
+            }
+        } else {
+            app.emit("dependency-install-progress", "ffmpeg already installed (managed)").map_err(|e| e.to_string())?;
+        }
+    } else {
+        app.emit("dependency-install-progress", "ffmpeg already installed (system)").map_err(|e| e.to_string())?;
+    }
+    
+    app.emit("dependency-install-progress", "All dependencies are available.").map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn generate_thumbnail_data(app: tauri::AppHandle, file_path: String) -> Result<String, String> {
     let input_path = std::path::PathBuf::from(&file_path);
     
     if !input_path.exists() {
@@ -848,7 +1060,14 @@ async fn generate_thumbnail_data(file_path: String) -> Result<String, String> {
 
     // For videos, use FFmpeg to extract thumbnail to stdout and encode as base64
     if ["mp4", "avi", "mov", "mkv", "webm", "flv", "wmv", "m4v", "3gp"].contains(&extension.as_str()) {
-        let mut cmd = Command::new("ffmpeg");
+        let ffmpeg_cmd = get_ffmpeg_command();
+        let mut cmd = if ffmpeg_cmd == "managed" {
+            let ffmpeg_path = get_ffmpeg_path(&app);
+            create_hidden_command_with_path(&ffmpeg_path)
+        } else {
+            create_hidden_command("ffmpeg")
+        };
+        
         cmd.arg("-i")
             .arg(&file_path)
             .arg("-ss")
@@ -936,6 +1155,136 @@ async fn show_in_explorer(file_path: String) -> Result<(), String> {
     Ok(())
 }
 
+fn get_yt_dlp_command() -> String {
+    // Try system-wide yt-dlp first
+    if create_hidden_command("yt-dlp").arg("--version").output().is_ok() {
+        "yt-dlp".to_string()
+    } else {
+        // Fallback to managed version (will be handled by get_yt_dlp_path)
+        "managed".to_string()
+    }
+}
+
+fn get_ffmpeg_command() -> String {
+    // Try system-wide ffmpeg first
+    if create_hidden_command("ffmpeg").arg("-version").output().is_ok() {
+        "ffmpeg".to_string()
+    } else {
+        // Fallback to managed version (will be handled by get_ffmpeg_path)
+        "managed".to_string()
+    }
+}
+
+fn get_ffprobe_command() -> String {
+    // Try system-wide ffprobe first
+    if create_hidden_command("ffprobe").arg("-version").output().is_ok() {
+        "ffprobe".to_string()
+    } else {
+        // Fallback to managed version (will be handled by get_ffprobe_path)
+        "managed".to_string()
+    }
+}
+
+fn get_app_dir(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("failed to get app data dir")
+}
+
+fn get_yt_dlp_path(app: &tauri::AppHandle) -> PathBuf {
+    get_app_dir(app).join("yt-dlp.exe")
+}
+
+fn get_ffmpeg_path(app: &tauri::AppHandle) -> PathBuf {
+    let app_dir = get_app_dir(app);
+    
+    // Try to find ffmpeg in any extracted directory
+    if let Ok(entries) = fs::read_dir(&app_dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.contains("ffmpeg") && name.contains("essentials") {
+                    let ffmpeg_path = entry.path().join("bin").join("ffmpeg.exe");
+                    if ffmpeg_path.exists() {
+                        return ffmpeg_path;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback to default path
+    app_dir.join("ffmpeg").join("bin").join("ffmpeg.exe")
+}
+
+fn get_ffprobe_path(app: &tauri::AppHandle) -> PathBuf {
+    let app_dir = get_app_dir(app);
+    
+    // Try to find ffprobe in any extracted directory
+    if let Ok(entries) = fs::read_dir(&app_dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.contains("ffmpeg") && name.contains("essentials") {
+                    let ffprobe_path = entry.path().join("bin").join("ffprobe.exe");
+                    if ffprobe_path.exists() {
+                        return ffprobe_path;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback to default path
+    app_dir.join("ffmpeg").join("bin").join("ffprobe.exe")
+}
+
+async fn get_latest_release_assets(repo: &str) -> Result<GithubRelease, String> {
+    let client = Client::new();
+    let url = format!("{}{}/releases/latest", GITHUB_API_URL, repo);
+    
+    client
+        .get(&url)
+        .header("User-Agent", "tauri-app")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<GithubRelease>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn download_file(url: &str, dest: &PathBuf) -> Result<(), String> {
+    let response = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    let mut dest_file = File::create(dest).map_err(|e| e.to_string())?;
+    let content = response.bytes().await.map_err(|e| e.to_string())?;
+    copy(&mut content.as_ref(), &mut dest_file).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn extract_zip(zip_path: &PathBuf, dest_dir: &PathBuf) -> Result<(), String> {
+    let file = File::open(zip_path).map_err(|e| e.to_string())?;
+    let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let outpath = dest_dir.join(file.name());
+
+        if file.is_dir() {
+            fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(p).map_err(|e| e.to_string())?;
+                }
+            }
+            let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
+            copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -950,13 +1299,71 @@ pub fn run() {
             process_video,
             list_files,
             check_dependencies,
+            install_dependencies,
             delete_file,
             open_file,
             start_video_server,
             get_video_url,
             generate_thumbnail_data,
-            show_in_explorer
+            show_in_explorer,
+            get_installation_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+async fn get_installation_logs(app: tauri::AppHandle) -> Result<String, String> {
+    let app_dir = get_app_dir(&app);
+    let mut logs = Vec::new();
+    
+    logs.push(format!("App directory: {}", app_dir.display()));
+    
+    // Check yt-dlp
+    let ytdlp_path = get_yt_dlp_path(&app);
+    logs.push(format!("yt-dlp path: {}", ytdlp_path.display()));
+    logs.push(format!("yt-dlp exists: {}", ytdlp_path.exists()));
+    
+    // Check ffmpeg
+    let ffmpeg_path = get_ffmpeg_path(&app);
+    logs.push(format!("ffmpeg path: {}", ffmpeg_path.display()));
+    logs.push(format!("ffmpeg exists: {}", ffmpeg_path.exists()));
+    
+    // Check ffprobe
+    let ffprobe_path = get_ffprobe_path(&app);
+    logs.push(format!("ffprobe path: {}", ffprobe_path.display()));
+    logs.push(format!("ffprobe exists: {}", ffprobe_path.exists()));
+    
+    // List app directory contents
+    logs.push("App directory contents:".to_string());
+    if let Ok(entries) = fs::read_dir(&app_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+            logs.push(format!("  {} {}", if is_dir { "[DIR]" } else { "[FILE]" }, name));
+            
+            // If it's a directory that looks like ffmpeg, list its contents
+            if is_dir && name.contains("ffmpeg") {
+                if let Ok(sub_entries) = fs::read_dir(entry.path()) {
+                    for sub_entry in sub_entries.flatten() {
+                        let sub_name = sub_entry.file_name().to_string_lossy().to_string();
+                        let sub_is_dir = sub_entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+                        logs.push(format!("    {} {}", if sub_is_dir { "[DIR]" } else { "[FILE]" }, sub_name));
+                        
+                        // Check bin directory
+                        if sub_is_dir && sub_name == "bin" {
+                            if let Ok(bin_entries) = fs::read_dir(sub_entry.path()) {
+                                for bin_entry in bin_entries.flatten() {
+                                    let bin_name = bin_entry.file_name().to_string_lossy().to_string();
+                                    logs.push(format!("      [FILE] {}", bin_name));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(logs.join("\n"))
 }
