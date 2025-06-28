@@ -10,6 +10,23 @@ import { listen } from '@tauri-apps/api/event'
 
 type ActiveTab = 'download' | 'edit' | 'files' | 'settings'
 
+const getInitialOverlayState = () => {
+  const dependencyStatus = localStorage.getItem('dependency-check-status')
+  const lastCheckTime = localStorage.getItem('dependency-check-time')
+
+  if (dependencyStatus === 'installed' && lastCheckTime) {
+    const timeSinceLastCheck = Date.now() - parseInt(lastCheckTime, 10)
+    const twentyFourHours = 24 * 60 * 60 * 1000
+    if (timeSinceLastCheck < twentyFourHours) {
+      console.log('Cached data is valid, not showing overlay.')
+      return false // Don't show overlay
+    }
+  }
+
+  console.log('Cached data invalid or missing, showing overlay.')
+  return true // Show overlay
+}
+
 function DependencyInstaller({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50">
@@ -24,7 +41,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('download')
   const [selectedVideoFile, setSelectedVideoFile] = useState<string>('')
   const [installMessage, setInstallMessage] = useState('Checking dependencies...')
-  const [showDependencyOverlay, setShowDependencyOverlay] = useState(true)
+  const [showDependencyOverlay, setShowDependencyOverlay] = useState(getInitialOverlayState)
 
   useEffect(() => {
     const handleContextmenu = (e: MouseEvent) => {
@@ -36,31 +53,11 @@ function App() {
       setInstallMessage(event.payload)
     })
 
-    // Check localStorage immediately to see if we can skip the entire process
-    const dependencyStatus = localStorage.getItem('dependency-check-status')
-    const lastCheckTime = localStorage.getItem('dependency-check-time')
-    const currentTime = Date.now()
-    
-    // If we have a valid cached status within 24 hours, use it
-    if (dependencyStatus === 'installed' && lastCheckTime) {
-      const timeSinceLastCheck = currentTime - parseInt(lastCheckTime)
-      const twentyFourHours = 24 * 60 * 60 * 1000
-      
-      if (timeSinceLastCheck < twentyFourHours) {
-        // Use cached data - no need to check backend
-        console.log('Using cached dependency status - skipping backend check')
-        setShowDependencyOverlay(false)
-        setInstallMessage('Dependencies verified from cache')
-        
-        // Set up cleanup and return early
-        return function cleanup() {
-          document.removeEventListener('contextmenu', handleContextmenu)
-          unlisten.then(f => f())
-        }
-      }
+    // If the overlay isn't showing, our cached data was valid, so we don't need to do anything.
+    if (!showDependencyOverlay) {
+      return
     }
 
-    // Only define and call checkAndInstall if we need to actually check
     const checkAndInstall = async () => {
       try {
         setInstallMessage('Checking dependencies...')
@@ -68,12 +65,12 @@ function App() {
         
         if (deps.ytdlp_installed && deps.ffmpeg_installed) {
           localStorage.setItem('dependency-check-status', 'installed')
-          localStorage.setItem('dependency-check-time', currentTime.toString())
+          localStorage.setItem('dependency-check-time', Date.now().toString())
         } else {
           setInstallMessage('Installing missing dependencies...')
           await invoke('install_dependencies')
           localStorage.setItem('dependency-check-status', 'installed')
-          localStorage.setItem('dependency-check-time', currentTime.toString())
+          localStorage.setItem('dependency-check-time', Date.now().toString())
         }
       } catch (error) {
         console.error("Failed to install dependencies:", error)
@@ -90,7 +87,7 @@ function App() {
       document.removeEventListener('contextmenu', handleContextmenu)
       unlisten.then(f => f())
     }
-  }, [])
+  }, [showDependencyOverlay])
 
   const tabVariants = {
     inactive: { scale: 0.95, opacity: 0.7 },
