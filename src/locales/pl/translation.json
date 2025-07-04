@@ -145,6 +145,7 @@
     },
     "filter_options": {
       "all": "Wszystkie",
+      "folders": "Foldery",
       "video": "Wideo",
       "audio": "Audio",
       "image": "Obrazy"
@@ -156,8 +157,10 @@
       "show_in_folder": "Pokaż w folderze",
       "edit": "Edytuj",
       "delete": "Usuń",
+      "delete_folder": "Usuń folder",
       "play_in_app": "Odtwórz w aplikacji",
-      "open_external": "Otwórz aplikacją systemową"
+      "open_external": "Otwórz aplikacją systemową",
+      "open_folder": "Otwórz folder"
     },
     "current_directory": "Bieżący Folder",
     "change_directory_button": "Zmień",
@@ -173,6 +176,10 @@
     "confirm_delete_single": "Usuń Plik",
     "confirm_delete_multiple": "Usuń {{count}} Plików",
     "delete_warning_modal": "Ta akcja nie może być cofnięta.",
+    "back_button": "Wstecz",
+    "create_folder_button": "Nowy folder",
+    "create_folder_prompt": "Wprowadź nazwę folderu:",
+    "failed_to_create_folder": "Nie udało się utworzyć folderu: ",
     "and_more_files": "...i {{count}} więcej plików",
     "cancel": "Anuluj",
     "delete_file": "Usuń",
@@ -245,7 +252,8 @@
     "modal": {
       "videoLibrary": {
         "title": "Biblioteka wideo",
-        "noVideosFound": "Nie znaleziono wideo w bibliotece"
+        "noVideosFound": "Nie znaleziono wideo w bibliotece",
+        "back": "Wstecz"
       },
       "cropSettings": {
         "title": "Ustawienia kadrowania",

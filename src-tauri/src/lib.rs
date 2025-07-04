@@ -596,34 +596,46 @@ async fn execute_video_processing(
 
 #[tauri::command]
 async fn list_files(directory: String) -> Result<Vec<serde_json::Value>, String> {
-    let path = PathBuf::from(directory);
+    let path = PathBuf::from(&directory);
     
     if !path.exists() {
         return Err("Directory does not exist".to_string());
     }
 
-    let mut files = Vec::new();
+    let mut items = Vec::new();
     
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
             if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() {
-                    let file_info = serde_json::json!({
+                let item_info = if metadata.is_dir() {
+                    serde_json::json!({
+                        "name": entry.file_name().to_string_lossy(),
+                        "path": entry.path().to_string_lossy(),
+                        "size": 0,
+                        "modified": metadata.modified()
+                            .map(|time| time.duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default().as_secs())
+                            .unwrap_or(0),
+                        "is_directory": true
+                    })
+                } else {
+                    serde_json::json!({
                         "name": entry.file_name().to_string_lossy(),
                         "path": entry.path().to_string_lossy(),
                         "size": metadata.len(),
                         "modified": metadata.modified()
                             .map(|time| time.duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default().as_secs())
-                            .unwrap_or(0)
-                    });
-                    files.push(file_info);
-                }
+                            .unwrap_or(0),
+                        "is_directory": false
+                    })
+                };
+                items.push(item_info);
             }
         }
     }
 
-    Ok(files)
+    Ok(items)
 }
 
 #[tauri::command]
@@ -700,6 +712,80 @@ async fn open_file(file_path: String) -> Result<(), String> {
             }
             Err(e) => Err(format!("Failed to open file: {}", e))
         }
+    }
+}
+
+#[tauri::command]
+async fn create_directory(directory_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&directory_path);
+    
+    if path.exists() {
+        return Err("Directory already exists".to_string());
+    }
+    
+    match std::fs::create_dir_all(&path) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to create directory: {}", e))
+    }
+}
+
+#[tauri::command]
+async fn rename_item(old_path: String, new_path: String) -> Result<(), String> {
+    let old = PathBuf::from(&old_path);
+    let new = PathBuf::from(&new_path);
+    
+    if !old.exists() {
+        return Err("Item does not exist".to_string());
+    }
+    
+    if new.exists() {
+        return Err("Target path already exists".to_string());
+    }
+    
+    match std::fs::rename(&old, &new) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to rename item: {}", e))
+    }
+}
+
+#[tauri::command]
+async fn move_item(source_path: String, destination_path: String) -> Result<(), String> {
+    let source = PathBuf::from(&source_path);
+    let dest = PathBuf::from(&destination_path);
+    
+    if !source.exists() {
+        return Err("Source item does not exist".to_string());
+    }
+    
+    // Create destination directory if it doesn't exist
+    if let Some(parent) = dest.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create destination directory: {}", e))?;
+        }
+    }
+    
+    match std::fs::rename(&source, &dest) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to move item: {}", e))
+    }
+}
+
+#[tauri::command]
+async fn delete_directory(directory_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&directory_path);
+    
+    if !path.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+    
+    if !path.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+    
+    match std::fs::remove_dir_all(&path) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to delete directory: {}", e))
     }
 }
 
@@ -1302,6 +1388,10 @@ pub fn run() {
             install_dependencies,
             delete_file,
             open_file,
+            create_directory,
+            rename_item,
+            move_item,
+            delete_directory,
             start_video_server,
             get_video_url,
             generate_thumbnail_data,

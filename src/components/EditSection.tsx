@@ -4,7 +4,7 @@ import {
   Film, Scissors, Volume2, Crop, Filter, Play, RotateCw, 
   Download, Upload, Pause, SkipBack, SkipForward, FileVideo,
   MoreVertical, Maximize2, Minimize2, Music, Palette, Trash2,
-  CheckCircle, AlertCircle, Info, X
+  CheckCircle, AlertCircle, Info, X, Folder
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -59,6 +59,8 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
   const [isLoadingVideo, setIsLoadingVideo] = useState(false)
   const [libraryFiles, setLibraryFiles] = useState<VideoLibraryFile[]>([])
   const [showLibrary, setShowLibrary] = useState(false)
+  const [libraryDirectory, setLibraryDirectory] = useState<string>('./downloads')
+  const [libraryDirectoryHistory, setLibraryDirectoryHistory] = useState<string[]>(['./downloads'])
   
   // Playback states
   const [currentTime, setCurrentTime] = useState(0)
@@ -140,7 +142,7 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
   // Load library files on component mount
   useEffect(() => {
     loadLibraryFiles()
-  }, [])
+  }, [libraryDirectory])
 
   // Load video when prop changes
   useEffect(() => {
@@ -546,13 +548,21 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
 
   const loadLibraryFiles = async () => {
     try {
-      const files = await invoke('list_files', { directory: './downloads' }) as any[]
-      const videoFiles = await Promise.all(
-        files
-          .filter(file => ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(
+      const files = await invoke('list_files', { directory: libraryDirectory }) as any[]
+      const libraryItems = await Promise.all(
+        files.map(async (file: any, index: number) => {
+          if (file.is_directory) {
+            return {
+              id: `${index}`,
+              name: file.name,
+              path: file.path,
+              size: '',
+              type: 'directory',
+              thumbnail: undefined
+            };
+          } else if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(
             file.name.split('.').pop()?.toLowerCase() || ''
-          ))
-          .map(async (file: any, index: number) => {
+          )) {
             // Generate thumbnail for video
             let thumbnail: string | undefined;
             try {
@@ -571,9 +581,20 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               type: 'video',
               thumbnail
             };
-          })
+          }
+          return null;
+        })
       );
-      setLibraryFiles(videoFiles)
+      
+      // Filter out null values and sort directories first
+      const validItems = libraryItems.filter(item => item !== null) as VideoLibraryFile[]
+      const sortedItems = validItems.sort((a, b) => {
+        if (a.type === 'directory' && b.type !== 'directory') return -1
+        if (a.type !== 'directory' && b.type === 'directory') return 1
+        return a.name.localeCompare(b.name)
+      })
+      
+      setLibraryFiles(sortedItems)
     } catch (error) {
       console.error('Error loading library files:', error)
       addToast({
@@ -593,9 +614,24 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
   }
 
   const selectVideoFromLibrary = async (file: VideoLibraryFile) => {
-    setSelectedFile(file.path)
-    await loadVideo(file.path)
-    setShowLibrary(false)
+    if (file.type === 'directory') {
+      setLibraryDirectory(file.path)
+      setLibraryDirectoryHistory(prev => [...prev, file.path])
+    } else {
+      setSelectedFile(file.path)
+      await loadVideo(file.path)
+      setShowLibrary(false)
+    }
+  }
+
+  const navigateLibraryBack = () => {
+    if (libraryDirectoryHistory.length > 1) {
+      const newHistory = [...libraryDirectoryHistory]
+      newHistory.pop()
+      const previousDirectory = newHistory[newHistory.length - 1]
+      setLibraryDirectoryHistory(newHistory)
+      setLibraryDirectory(previousDirectory)
+    }
   }
 
   const selectVideoFile = async () => {
@@ -2103,7 +2139,12 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowLibrary(false)}
+            onClick={() => {
+              setShowLibrary(false)
+              // Reset to root directory when closing
+              setLibraryDirectory('./downloads')
+              setLibraryDirectoryHistory(['./downloads'])
+            }}
           >
               <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -2115,11 +2156,46 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">{t('editSection.modal.videoLibrary.title')}</h2>
                 <button
-                  onClick={() => setShowLibrary(false)}
+                  onClick={() => {
+                    setShowLibrary(false)
+                    // Reset to root directory when closing
+                    setLibraryDirectory('./downloads')
+                    setLibraryDirectoryHistory(['./downloads'])
+                  }}
                   className="glass-button p-2 text-gray-400 hover:text-white rounded-lg hover:scale-110 transition-all"
                 >
                   <X className="w-5 h-5" />
                 </button>
+              </div>
+              
+              {/* Navigation Controls */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={navigateLibraryBack}
+                    disabled={libraryDirectoryHistory.length <= 1}
+                    className={`glass-button px-3 py-2 rounded-lg transition-all ${
+                      libraryDirectoryHistory.length <= 1 
+                        ? 'opacity-50 cursor-not-allowed' 
+                        : 'hover:scale-105'
+                    }`}
+                  >
+                    ← {t('editSection.modal.videoLibrary.back')}
+                  </button>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg px-3 py-1">
+                  <div className="flex items-center space-x-1 text-sm">
+                    <Folder className="w-4 h-4 text-gray-400" />
+                    {libraryDirectoryHistory.map((dir, index) => (
+                      <React.Fragment key={index}>
+                        {index > 0 && <span className="text-gray-500">/</span>}
+                        <span className={index === libraryDirectoryHistory.length - 1 ? 'text-white font-semibold' : 'text-gray-400'}>
+                          {dir === './downloads' ? 'Downloads' : dir.split('/').pop() || dir}
+                        </span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto max-h-80 hidden-scrollbar p-6 -m-4">
                 {libraryFiles.map((file) => (
@@ -2150,12 +2226,20 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                         className={`w-full h-full flex items-center justify-center ${file.thumbnail ? 'absolute inset-0' : ''}`}
                         style={{ display: file.thumbnail ? 'none' : 'flex' }}
                       >
-                        <FileVideo className="w-8 h-8 text-purple-400" />
+                        {file.type === 'directory' ? (
+                          <Folder className="w-8 h-8 text-yellow-400" />
+                        ) : (
+                          <FileVideo className="w-8 h-8 text-purple-400" />
+                        )}
                       </div>
-                      {/* Video play indicator */}
+                      {/* Video play indicator or folder open indicator */}
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
                         <div className="bg-black/50 backdrop-blur-sm rounded-full p-2">
-                          <Play className="w-6 h-6 text-white fill-current" />
+                          {file.type === 'directory' ? (
+                            <Folder className="w-6 h-6 text-yellow-400" />
+                          ) : (
+                            <Play className="w-6 h-6 text-white fill-current" />
+                          )}
                         </div>
                       </div>
                     </div>

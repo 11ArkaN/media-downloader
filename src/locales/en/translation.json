@@ -145,6 +145,7 @@
     },
     "filter_options": {
       "all": "All",
+      "folders": "Folders",
       "video": "Videos",
       "audio": "Audio",
       "image": "Images"
@@ -156,8 +157,10 @@
       "show_in_folder": "Show in folder",
       "edit": "Edit",
       "delete": "Delete",
+      "delete_folder": "Delete Folder",
       "play_in_app": "Play in App",
-      "open_external": "Open with system app"
+      "open_external": "Open with system app",
+      "open_folder": "Open Folder"
     },
     "current_directory": "Current Directory",
     "change_directory_button": "Change",
@@ -173,6 +176,10 @@
     "confirm_delete_single": "Delete File",
     "confirm_delete_multiple": "Delete {{count}} Files",
     "delete_warning_modal": "This action cannot be undone.",
+    "back_button": "Back",
+    "create_folder_button": "New Folder",
+    "create_folder_prompt": "Enter folder name:",
+    "failed_to_create_folder": "Failed to create folder: ",
     "and_more_files": "...and {{count}} more files",
     "cancel": "Cancel",
     "delete_file": "Delete",
@@ -243,11 +250,12 @@
       "trim": "Trim",
       "to": "to"
     },
-    "modal": {
-      "videoLibrary": {
-        "title": "Video Library",
-        "noVideosFound": "No videos found in library"
-      },
+          "modal": {
+        "videoLibrary": {
+          "title": "Video Library",
+          "noVideosFound": "No videos found in library",
+          "back": "Back"
+        },
       "cropSettings": {
         "title": "Crop Settings",
         "xPosition": "X Position",

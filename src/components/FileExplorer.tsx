@@ -13,13 +13,14 @@ import Portal from './Portal';
 interface MediaFile {
   id: string
   name: string
-  type: 'video' | 'audio' | 'image' | 'other'
+  type: 'video' | 'audio' | 'image' | 'other' | 'directory'
   size: string
   duration?: string
   path: string
   dateAdded: string
   sizeBytes: number
   extension: string
+  isDirectory?: boolean
 }
 
 interface FileExplorerProps {
@@ -315,10 +316,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [files, setFiles] = useState<MediaFile[]>([])
   const [currentDirectory, setCurrentDirectory] = useState<string>('./downloads')
+  const [directoryHistory, setDirectoryHistory] = useState<string[]>(['./downloads'])
   const [isLoading, setIsLoading] = useState(false)
   const [sortBy, setSortBy] = useState<'dateAdded' | 'name' | 'sizeBytes'>('dateAdded')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio' | 'image'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio' | 'image' | 'directory'>('all')
   const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number; file: MediaFile; position: 'down' | 'up' } | null>(null)
   const [videoPlayer, setVideoPlayer] = useState<{ isOpen: boolean; videoUrl: string; fileName: string }>({
     isOpen: false,
@@ -368,16 +370,17 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     try {
       const fileList = await invoke('list_files', { directory }) as any[]
       const mediaFiles = fileList.map((file: any, index: number) => {
-        const fileType = getFileType(file.name)
+        const fileType = file.is_directory ? 'directory' : getFileType(file.name)
         return {
           id: `${index}`,
           name: file.name,
           type: fileType,
-          size: formatFileSize(file.size),
+          size: file.is_directory ? '' : formatFileSize(file.size),
           sizeBytes: file.size,
           path: file.path,
           dateAdded: new Date(file.modified * 1000).toLocaleDateString(),
-          extension: file.name.split('.').pop()?.toLowerCase() || ''
+          extension: file.is_directory ? '' : (file.name.split('.').pop()?.toLowerCase() || ''),
+          isDirectory: file.is_directory
         }
       })
       setFiles(mediaFiles)
@@ -389,7 +392,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     }
   }
 
-  const getFileType = (filename: string): 'video' | 'audio' | 'image' | 'other' => {
+  const getFileType = (filename: string): 'video' | 'audio' | 'image' | 'other' | 'directory' => {
     const ext = filename.split('.').pop()?.toLowerCase()
     
     if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v', '3gp'].includes(ext || '')) return 'video'
@@ -428,6 +431,38 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     loadFiles(currentDirectory)
   }
 
+  const navigateToDirectory = (directoryPath: string) => {
+    setCurrentDirectory(directoryPath)
+    setDirectoryHistory(prev => [...prev, directoryPath])
+  }
+
+  const navigateBack = () => {
+    if (directoryHistory.length > 1) {
+      const newHistory = [...directoryHistory]
+      newHistory.pop()
+      const previousDirectory = newHistory[newHistory.length - 1]
+      setDirectoryHistory(newHistory)
+      setCurrentDirectory(previousDirectory)
+    }
+  }
+
+  const createNewFolder = async () => {
+            const folderName = prompt(t('file_explorer.create_folder_prompt'))
+    if (folderName && folderName.trim()) {
+      try {
+        // Use proper path joining - let the backend handle path separators
+        const newFolderPath = currentDirectory.endsWith('/') || currentDirectory.endsWith('\\') 
+          ? `${currentDirectory}${folderName.trim()}`
+          : `${currentDirectory}/${folderName.trim()}`
+        await invoke('create_directory', { directoryPath: newFolderPath })
+        await refreshFiles()
+      } catch (error) {
+        console.error('Error creating folder:', error)
+        alert(t('file_explorer.failed_to_create_folder') + error)
+      }
+    }
+  }
+
   const previewFile = async (file: MediaFile) => {
     try {
       await invoke('open_file', { filePath: file.path })
@@ -438,7 +473,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   }
 
   const editFile = (file: MediaFile) => {
-    if (file.type === 'video' && onSelectVideo) {
+    if (file.type === 'directory') {
+      navigateToDirectory(file.path)
+    } else if (file.type === 'video' && onSelectVideo) {
       onSelectVideo(file)
     } else {
       alert(t('file_explorer.edit_warning'))
@@ -451,11 +488,15 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       files: [file],
       onConfirm: async () => {
         try {
-          await invoke('delete_file', { filePath: file.path })
+          if (file.type === 'directory') {
+            await invoke('delete_directory', { directoryPath: file.path })
+          } else {
+            await invoke('delete_file', { filePath: file.path })
+          }
           await refreshFiles()
           setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => {} })
         } catch (error) {
-          console.error('Error deleting file:', error)
+          console.error('Error deleting item:', error)
           alert(t('file_explorer.failed_to_delete_file') + error)
         }
       }
@@ -466,6 +507,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     const iconSize = size === 'sm' ? 'w-4 h-4' : size === 'md' ? 'w-6 h-6' : 'w-8 h-8'
     
     switch (type) {
+      case 'directory':
+        return <Folder className={`${iconSize} text-yellow-400`} />
       case 'video':
         return <FileVideo className={`${iconSize} text-purple-400`} />
       case 'audio':
@@ -479,6 +522,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
 
   const getTypeColor = (type: string) => {
     switch (type) {
+      case 'directory': return 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30'
       case 'video': return 'bg-purple-600/20 text-purple-300 border-purple-500/30'
       case 'audio': return 'bg-green-600/20 text-green-300 border-green-500/30'
       case 'image': return 'bg-blue-600/20 text-blue-300 border-blue-500/30'
@@ -494,6 +538,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     })
 
     return filtered.sort((a, b) => {
+      // Always sort directories first
+      if (a.type === 'directory' && b.type !== 'directory') return -1
+      if (a.type !== 'directory' && b.type === 'directory') return 1
+      
       let comparison = 0
       
       switch (sortBy) {
@@ -735,6 +783,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
              hover:scale-[1.01] transition-all duration-200`
       }
       onClick={() => toggleFileSelection(file.id)}
+      onDoubleClick={() => {
+        if (file.type === 'directory') {
+          navigateToDirectory(file.path)
+        } else {
+          editFile(file)
+        }
+      }}
     >
       <AnimatePresence>
         {selectedFiles.includes(file.id) && (
@@ -779,7 +834,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             </div>
           </div>
           <div className={`px-2 py-1 rounded-full text-xs font-semibold ${getTypeColor(file.type)}`}>
-            {file.type}
+            {file.type === 'directory' ? 'folder' : file.type}
           </div>
           <button onClick={(e) => handleContextMenu(e, file)} className="glass-button p-2 rounded-full hover:scale-110 transition-transform">
             <MoreVertical className="w-4 h-4 text-gray-400" />
@@ -789,7 +844,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center z-10">
         <div className="flex space-x-2">
-          {file.type === 'video' ? (
+          {file.type === 'directory' ? (
+            <button onClick={(e) => { e.stopPropagation(); navigateToDirectory(file.path); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-yellow-500/30" title={t('file_explorer.file_actions.open_folder')}>
+              <FolderOpen className="w-5 h-5 text-yellow-300" />
+            </button>
+          ) : file.type === 'video' ? (
             <button onClick={(e) => { e.stopPropagation(); playVideoInApp(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-purple-500/30" title={t('file_explorer.file_actions.play_in_app')}>
               <Play className="w-5 h-5 text-purple-300" />
             </button>
@@ -803,7 +862,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
               <Edit className="w-5 h-5 text-white" />
             </button>
           )}
-          <button onClick={(e) => { e.stopPropagation(); deleteFile(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-red-500/30" title={t('file_explorer.file_actions.delete')}>
+          <button onClick={(e) => { e.stopPropagation(); deleteFile(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-red-500/30" title={file.type === 'directory' ? t('file_explorer.file_actions.delete_folder') : t('file_explorer.file_actions.delete')}>
             <Trash2 className="w-5 h-5 text-red-300" />
           </button>
         </div>
@@ -860,6 +919,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           <label className="text-sm font-medium text-gray-400">{t('file_explorer.filter_by_label')}:</label>
           <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="dropdown">
             <option value="all">{t('file_explorer.filter_options.all')}</option>
+            <option value="directory">{t('file_explorer.filter_options.folders')}</option>
             <option value="video">{t('file_explorer.filter_options.video')}</option>
             <option value="audio">{t('file_explorer.filter_options.audio')}</option>
             <option value="image">{t('file_explorer.filter_options.image')}</option>
@@ -916,7 +976,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
               zIndex: 9999
             }}
           >
-            {showContextMenu.file.type === 'video' ? (
+            {showContextMenu.file.type === 'directory' ? (
+              <button onClick={() => { navigateToDirectory(showContextMenu.file.path); setShowContextMenu(null); }} className="context-menu-item">
+                <div className="flex items-center space-x-2 text-yellow-400">
+                  <FolderOpen className="w-4 h-4" />
+                  <span>{t('file_explorer.file_actions.open_folder')}</span>
+                </div>
+              </button>
+            ) : showContextMenu.file.type === 'video' ? (
               <button onClick={() => { playVideoInApp(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
                 <div className="flex items-center space-x-2 text-purple-400">
                   <Play className="w-4 h-4" />
@@ -955,7 +1022,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             <button onClick={() => { deleteFile(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
               <div className="flex items-center space-x-2 text-red-400">
                 <Trash2 className="w-4 h-4" />
-                <span>{t('file_explorer.file_actions.delete')}</span>
+                <span>{showContextMenu.file.type === 'directory' 
+                  ? t('file_explorer.file_actions.delete_folder')
+                  : t('file_explorer.file_actions.delete')}
+                </span>
               </div>
             </button>
           </div>
@@ -977,12 +1047,46 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={navigateBack} 
+            disabled={directoryHistory.length <= 1}
+            className={`glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform ${directoryHistory.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {t('file_explorer.back_button')}
+          </button>
+          <button onClick={createNewFolder} className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform">
+            {t('file_explorer.create_folder_button')}
+          </button>
           <button onClick={selectDirectory} className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform">
             {t('file_explorer.change_directory_button')}
           </button>
           <button onClick={refreshFiles} className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform">
             {t('file_explorer.refresh_button')}
           </button>
+        </div>
+      </div>
+      
+      {/* Breadcrumb Navigation */}
+      <div className="bg-gray-800/50 rounded-lg p-3 mb-4">
+        <div className="flex items-center space-x-2 text-sm">
+          <Folder className="w-4 h-4 text-gray-400" />
+          {directoryHistory.map((dir, index) => (
+            <React.Fragment key={index}>
+              {index > 0 && <span className="text-gray-500">/</span>}
+              <button
+                onClick={() => {
+                  const newHistory = directoryHistory.slice(0, index + 1)
+                  setDirectoryHistory(newHistory)
+                  setCurrentDirectory(dir)
+                }}
+                className={`text-gray-300 hover:text-white transition-colors ${
+                  index === directoryHistory.length - 1 ? 'font-semibold text-white' : 'hover:underline'
+                }`}
+              >
+                {dir === './downloads' ? 'Downloads' : dir.split('/').pop() || dir}
+              </button>
+            </React.Fragment>
+          ))}
         </div>
       </div>
       
