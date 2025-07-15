@@ -41,7 +41,13 @@
           "description": "Preferowana jakość wideo do pobrania",
           "options": {
             "best": "Najlepsza jakość",
-            "worst": "Najgorsza jakość"
+            "worst": "Najgorsza jakość",
+            "2160p": "4K (2160p)",
+            "1440p": "1440p (QHD)",
+            "1080p": "1080p (Full HD)",
+            "720p": "720p (HD)",
+            "480p": "480p (SD)",
+            "320p": "320p"
           }
         }
       },
@@ -90,6 +96,9 @@
       }
     }
   },
+  "notifications": {
+    "dismiss": "Odrzuć powiadomienie"
+  },
   "app": {
     "title": "Media Downloader",
     "subtitle": "Zasilany przez yt-dlp i ffmpeg",
@@ -106,6 +115,9 @@
     "url_label": "URL Wideo",
     "url_placeholder": "Wklej link z YouTube, Vimeo, lub inny obsługiwany...",
     "format_label": "Format",
+    "quality_label": "Jakość Wideo",
+    "audio_label": "Dołącz Audio",
+    "audio_description": "Pobierz ścieżkę audio z wideo",
     "output_folder_label": "Folder Docelowy",
     "output_folder_placeholder": "Wybierz lokalizację pobierania...",
     "start_download_button": "Rozpocznij Pobieranie",
@@ -119,6 +131,86 @@
       "mp4": "Format MP4",
       "webm": "Format WebM",
       "bestaudio": "Tylko Audio"
+    },
+    "quality_options": {
+      "4k": "4K (2160p)",
+      "1440p": "1440p (QHD)",
+      "1080p": "1080p (Full HD)",
+      "720p": "720p (HD)",
+      "480p": "480p (SD)",
+      "320p": "320p",
+      "audio_only": "Tylko Audio"
+    },
+    "video_info": {
+      "title": "Informacje o Wideo",
+      "duration": "Czas trwania",
+      "max_resolution": "Maksymalna rozdzielczość",
+      "available_resolutions": "Dostępne jakości",
+      "has_audio": "Audio dostępne",
+      "loading": "Ładowanie informacji o wideo...",
+      "error": "Nie udało się załadować informacji o wideo",
+      "optimal_quality": "Zalecane"
+    },
+    "tooltips": {
+      "quality_selector": "Wybierz rozdzielczość wideo do pobrania. Wyższe rozdzielczości zapewniają lepszą jakość, ale większe pliki.",
+      "audio_toggle": "Dołącz lub wyklucz ścieżkę audio z pobieraniem wideo. Wyłączone dla pobierania tylko audio.",
+      "quality_4k": "Ultra Wysoka Rozdzielczość - Najlepsza jakość, największy rozmiar pliku",
+      "quality_1440p": "Quad HD - Doskonała jakość dla dużych ekranów",
+      "quality_1080p": "Full HD - Standardowa wysoka jakość do większości zastosowań",
+      "quality_720p": "HD - Dobra jakość, umiarkowany rozmiar pliku",
+      "quality_480p": "Standardowa Rozdzielczość - Mniejszy rozmiar pliku",
+      "quality_320p": "Niska rozdzielczość - Najmniejszy rozmiar pliku",
+      "quality_audio_only": "Pobierz tylko ścieżkę audio bez wideo",
+      "video_info_card": "Informacje o źródłowym wideo, aby pomóc wybrać najlepszą jakość",
+      "quality_availability": "Zielona kropka oznacza, że jakość jest dostępna ze źródła",
+      "quality_unavailable": "Czerwona kropka oznacza, że jakość nie jest dostępna - zostanie użyta najlepsza dostępna"
+    },
+    "help_text": {
+      "quality_selection": "Wybierz rozdzielczość wideo, która najlepiej odpowiada Twoim potrzebom. Wyższe rozdzielczości zapewniają lepszą jakość, ale skutkują większymi plikami.",
+      "audio_inclusion": "Wybierz, czy dołączyć audio do pobierania wideo. Ta opcja jest automatycznie wyłączona podczas pobierania tylko audio.",
+      "video_information": "Informacje o wideo są automatycznie pobierane po wprowadzeniu obsługiwanego URL, aby pomóc w wyborze najlepszej jakości.",
+      "quality_fallback": "Jeśli wybrana jakość nie jest dostępna, system automatycznie wybierze najlepszą dostępną jakość.",
+      "optimal_recommendation": "Jakości oznaczone jako 'Zalecane' odpowiadają maksymalnej rozdzielczości źródłowego wideo dla optymalnej jakości.",
+      "video_information_help_title": "Pomoc informacji o wideo",
+      "quality_selection_help_title": "Pomoc wyboru jakości",
+      "audio_settings_help_title": "Pomoc ustawień audio"
+    },
+    "errors": {
+      "invalid_url": "Proszę wprowadzić prawidłowy URL wideo",
+      "unsupported_url": "Ten URL nie jest obsługiwany. Proszę użyć YouTube, Vimeo lub innych obsługiwanych platform.",
+      "network_error": "Błąd sieci. Sprawdź połączenie internetowe i spróbuj ponownie.",
+      "video_info_failed": "Nie udało się załadować informacji o wideo. Wideo może być prywatne lub niedostępne.",
+      "audio_not_available": "Ścieżka audio nie jest dostępna dla tego wideo. Proszę wybrać jakość wideo.",
+      "quality_unavailable": "Wybrana jakość nie jest dostępna. Używam najlepszej dostępnej jakości.",
+      "format_invalid": "Wybrany format jakości jest nieprawidłowy. Spróbuj innej opcji jakości.",
+      "permission_denied": "Odmowa dostępu. Sprawdź uprawnienia folderu docelowego.",
+      "download_failed": "Pobieranie nie powiodło się. Spróbuj ponownie lub skontaktuj się z pomocą techniczną.",
+      "compatibility_issue": "Wykryto problem kompatybilności audio/wideo. Próbuję alternatywnego formatu.",
+      "url_validation_failed": "Walidacja URL nie powiodła się. Sprawdź format URL.",
+      "timeout_error": "Przekroczono limit czasu. Spróbuj ponownie.",
+      "server_error": "Wystąpił błąd serwera. Spróbuj ponownie później."
+    },
+    "notifications": {
+      "quality_fallback": "Wybrana jakość {{requestedQuality}} niedostępna. Używam {{actualQuality}}.",
+      "audio_compatibility_warning": "Wykryto problem kompatybilności audio. Pobieranie może kontynuować z alternatywnym formatem.",
+      "video_info_timeout": "Ładowanie informacji o wideo trwa dłużej niż oczekiwano...",
+      "url_validation_success": "URL zwalidowany pomyślnie",
+      "format_validation_warning": "Ostrzeżenie walidacji formatu: {{warning}}",
+      "quality_fallback_title": "Zmiana jakości",
+      "compatibility_warning_title": "Ostrzeżenie kompatybilności",
+      "download_started_title": "Rozpoczęto pobieranie",
+      "download_started_message": "Twoje pobieranie zostało dodane do kolejki"
+    },
+    "ui": {
+      "available": "Dostępne",
+      "not_available": "Niedostępne",
+      "quality_available_from_source": "Jakość dostępna ze źródła",
+      "will_use_best_available_quality": "Zostanie użyta najlepsza dostępna jakość",
+      "choose_folder": "Wybierz folder...",
+      "choose_file": "Wybierz plik...",
+      "error_getting_logs": "Błąd pobierania logów: {{error}}",
+      "click_to_select_quality": "Kliknij, aby wybrać jakość {{quality}}",
+      "resolution_cannot_be_mapped": "Ta rozdzielczość nie może być zmapowana na opcję jakości"
     }
   },
   "file_explorer": {

@@ -41,7 +41,13 @@
           "description": "Preferred video quality for downloads",
           "options": {
             "best": "Best Quality",
-            "worst": "Worst Quality"
+            "worst": "Worst Quality",
+            "2160p": "4K (2160p)",
+            "1440p": "1440p (QHD)",
+            "1080p": "1080p (Full HD)",
+            "720p": "720p (HD)",
+            "480p": "480p (SD)",
+            "320p": "320p"
           }
         }
       },
@@ -90,6 +96,9 @@
       }
     }
   },
+  "notifications": {
+    "dismiss": "Dismiss notification"
+  },
   "app": {
     "title": "Media Downloader",
     "subtitle": "Powered by yt-dlp & ffmpeg",
@@ -106,6 +115,9 @@
     "url_label": "Video URL",
     "url_placeholder": "Paste YouTube, Vimeo, or other supported URL...",
     "format_label": "Format",
+    "quality_label": "Video Quality",
+    "audio_label": "Include Audio",
+    "audio_description": "Download audio track with video",
     "output_folder_label": "Output Folder",
     "output_folder_placeholder": "Choose download location...",
     "start_download_button": "Start Download",
@@ -119,6 +131,86 @@
       "mp4": "MP4 Format",
       "webm": "WebM Format",
       "bestaudio": "Audio Only"
+    },
+    "quality_options": {
+      "4k": "4K (2160p)",
+      "1440p": "1440p (QHD)",
+      "1080p": "1080p (Full HD)",
+      "720p": "720p (HD)",
+      "480p": "480p (SD)",
+      "320p": "320p",
+      "audio_only": "Audio Only"
+    },
+    "video_info": {
+      "title": "Video Information",
+      "duration": "Duration",
+      "max_resolution": "Max Resolution",
+      "available_resolutions": "Available Qualities",
+      "has_audio": "Audio Available",
+      "loading": "Loading video information...",
+      "error": "Could not load video information",
+      "optimal_quality": "Recommended"
+    },
+    "tooltips": {
+      "quality_selector": "Choose the video resolution for download. Higher resolutions provide better quality but larger file sizes.",
+      "audio_toggle": "Include or exclude audio track with video downloads. Disabled for audio-only downloads.",
+      "quality_4k": "Ultra High Definition - Best quality, largest file size",
+      "quality_1440p": "Quad HD - Excellent quality for large screens",
+      "quality_1080p": "Full HD - Standard high quality for most uses",
+      "quality_720p": "HD - Good quality, moderate file size",
+      "quality_480p": "Standard Definition - Smaller file size",
+      "quality_320p": "Low resolution - Smallest file size",
+      "quality_audio_only": "Download only the audio track without video",
+      "video_info_card": "Information about the source video to help you choose the best quality",
+      "quality_availability": "Green dot indicates the quality is available from the source",
+      "quality_unavailable": "Red dot indicates the quality is not available - will fallback to best available"
+    },
+    "help_text": {
+      "quality_selection": "Select the video resolution that best fits your needs. Higher resolutions provide better quality but result in larger file sizes.",
+      "audio_inclusion": "Choose whether to include audio with your video download. This option is automatically disabled when downloading audio-only.",
+      "video_information": "Video information is automatically fetched when you enter a supported URL to help you make the best quality choice.",
+      "quality_fallback": "If your selected quality is not available, the system will automatically choose the best available quality.",
+      "optimal_recommendation": "Qualities marked as 'Recommended' match the source video's maximum resolution for optimal quality.",
+      "video_information_help_title": "Video Information Help",
+      "quality_selection_help_title": "Quality Selection Help",
+      "audio_settings_help_title": "Audio Settings Help"
+    },
+    "errors": {
+      "invalid_url": "Please enter a valid video URL",
+      "unsupported_url": "This URL is not supported. Please use YouTube, Vimeo, or other supported platforms.",
+      "network_error": "Network error. Please check your internet connection and try again.",
+      "video_info_failed": "Failed to load video information. The video may be private or unavailable.",
+      "audio_not_available": "Audio track is not available for this video. Please select a video quality instead.",
+      "quality_unavailable": "Selected quality is not available. Using best available quality instead.",
+      "format_invalid": "Selected quality format is invalid. Please try a different quality option.",
+      "permission_denied": "Permission denied. Please check the output folder permissions.",
+      "download_failed": "Download failed. Please try again or contact support.",
+      "compatibility_issue": "Audio/video compatibility issue detected. Trying alternative format.",
+      "url_validation_failed": "URL validation failed. Please check the URL format.",
+      "timeout_error": "Request timed out. Please try again.",
+      "server_error": "Server error occurred. Please try again later."
+    },
+    "notifications": {
+      "quality_fallback": "Selected {{requestedQuality}} not available. Using {{actualQuality}} instead.",
+      "audio_compatibility_warning": "Audio compatibility issue detected. Download may proceed with alternative format.",
+      "video_info_timeout": "Video information loading is taking longer than expected...",
+      "url_validation_success": "URL validated successfully",
+      "format_validation_warning": "Format validation warning: {{warning}}",
+      "quality_fallback_title": "Quality Fallback",
+      "compatibility_warning_title": "Compatibility Warning",
+      "download_started_title": "Download Started",
+      "download_started_message": "Your download has been added to the queue"
+    },
+    "ui": {
+      "available": "Available",
+      "not_available": "Not Available",
+      "quality_available_from_source": "Quality available from source",
+      "will_use_best_available_quality": "Will use best available quality",
+      "choose_folder": "Choose folder...",
+      "choose_file": "Choose file...",
+      "error_getting_logs": "Error getting logs: {{error}}",
+      "click_to_select_quality": "Click to select {{quality}} quality",
+      "resolution_cannot_be_mapped": "This resolution cannot be mapped to a quality option"
     }
   },
   "file_explorer": {

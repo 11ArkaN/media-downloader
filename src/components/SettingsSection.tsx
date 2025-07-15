@@ -49,11 +49,43 @@ const SettingsSection: React.FC = () => {
       // In a real app, this would load from a config file or database
       const savedSettings = localStorage.getItem('media-downloader-settings')
       if (savedSettings) {
-        setSettings({ ...settings, ...JSON.parse(savedSettings) })
+        const parsedSettings = JSON.parse(savedSettings)
+        
+        // Migration logic for existing settings values to new resolution system
+        if (parsedSettings.defaultQuality) {
+          const migratedQuality = migrateQualityValue(parsedSettings.defaultQuality)
+          parsedSettings.defaultQuality = migratedQuality
+        }
+        
+        setSettings({ ...settings, ...parsedSettings })
       }
     } catch (error) {
       console.error('Error loading settings:', error)
     }
+  }
+
+  // Migration function to handle old quality values
+  const migrateQualityValue = (oldValue: string): string => {
+    // Define migration mapping for old values that might not be supported
+    const migrationMap: Record<string, string> = {
+      'best': 'best',           // Keep as is - maps to 2160p in download logic
+      'worst': 'worst',         // Keep as is - maps to 320p in download logic
+      '1080p': '1080p',         // Direct mapping
+      '720p': '720p',           // Direct mapping
+      '480p': '480p',           // Direct mapping
+      '360p': '320p',           // Migrate 360p to 320p
+      '320p': '320p',           // Direct mapping
+      '2160p': '2160p',         // Direct mapping
+      '1440p': '1440p',         // Direct mapping
+      // Legacy format options that might exist
+      'bestvideo+bestaudio': 'best',
+      'bestvideo': 'best',
+      'bestaudio': 'best',      // Fallback to best for audio-only legacy setting
+      'mp4': '1080p',           // Default to 1080p for format-based settings
+      'webm': '1080p'           // Default to 1080p for format-based settings
+    }
+
+    return migrationMap[oldValue] || '1080p' // Default fallback to 1080p
   }
 
   const saveSettings = async () => {
@@ -135,7 +167,7 @@ const SettingsSection: React.FC = () => {
       setShowLogs(true)
     } catch (error) {
       console.error('Error getting installation logs:', error)
-      setInstallationLogs(`Error getting logs: ${error}`)
+      setInstallationLogs(t('download_section.ui.error_getting_logs', { error }))
       setShowLogs(true)
     }
   }
@@ -168,9 +200,12 @@ const SettingsSection: React.FC = () => {
           options: [
             { value: 'best', label: t('settings.sections.download.default_quality.options.best') },
             { value: 'worst', label: t('settings.sections.download.default_quality.options.worst') },
-            { value: '1080p', label: '1080p' },
-            { value: '720p', label: '720p' },
-            { value: '480p', label: '480p' }
+            { value: '2160p', label: t('settings.sections.download.default_quality.options.2160p') },
+            { value: '1440p', label: t('settings.sections.download.default_quality.options.1440p') },
+            { value: '1080p', label: t('settings.sections.download.default_quality.options.1080p') },
+            { value: '720p', label: t('settings.sections.download.default_quality.options.720p') },
+            { value: '480p', label: t('settings.sections.download.default_quality.options.480p') },
+            { value: '320p', label: t('settings.sections.download.default_quality.options.320p') }
           ]
         }
       ]
@@ -301,7 +336,7 @@ const SettingsSection: React.FC = () => {
               value={value as string}
               onChange={(e) => updateSetting(setting.key, e.target.value)}
               className="input-field flex-1"
-              placeholder={setting.key === 'downloadPath' ? 'Choose folder...' : 'Choose file...'}
+              placeholder={setting.key === 'downloadPath' ? t('download_section.ui.choose_folder') : t('download_section.ui.choose_file')}
             />
             <button 
               onClick={() => selectPath(setting.key)}

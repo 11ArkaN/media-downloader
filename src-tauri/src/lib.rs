@@ -83,6 +83,21 @@ pub struct MediaInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct VideoInfoRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VideoInfoResponse {
+    pub title: Option<String>,
+    pub duration: Option<String>,
+    pub available_resolutions: Vec<String>,
+    pub max_resolution: Option<String>,
+    pub has_audio: bool,
+    pub thumbnail: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ReleaseAsset {
     pub name: String,
     pub browser_download_url: String,
@@ -91,6 +106,19 @@ pub struct ReleaseAsset {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GithubRelease {
     pub assets: Vec<ReleaseAsset>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppSettings {
+    pub default_quality: String,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            default_quality: "1080p".to_string(),
+        }
+    }
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -591,6 +619,277 @@ async fn execute_video_processing(
         }
     }
 
+    Ok(())
+}
+
+#[tauri::command]
+async fn fetch_video_info(
+    app: tauri::AppHandle,
+    request: VideoInfoRequest,
+) -> Result<VideoInfoResponse, String> {
+    let ytdlp_cmd = get_yt_dlp_command();
+    let mut cmd = if ytdlp_cmd == "managed" {
+        let ytdlp_path = get_yt_dlp_path(&app);
+        create_hidden_command_with_path(&ytdlp_path)
+    } else {
+        create_hidden_command("yt-dlp")
+    };
+
+    // Use yt-dlp to get video information without downloading
+    cmd.arg("--dump-json")
+        .arg("--no-warnings")
+        .arg("--no-playlist")
+        .arg(&request.url);
+
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                
+                // Parse yt-dlp JSON output
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output_str) {
+                    let title = json.get("title")
+                        .and_then(|t| t.as_str())
+                        .map(|s| s.to_string());
+                    
+                    let duration = json.get("duration")
+                        .and_then(|d| d.as_f64())
+                        .map(|d| {
+                            let minutes = (d as u64) / 60;
+                            let seconds = (d as u64) % 60;
+                            format!("{:02}:{:02}", minutes, seconds)
+                        });
+                    
+                    // Extract available formats and resolutions
+                    let mut available_resolutions = Vec::new();
+                    let mut max_height = 0u64;
+                    let mut has_audio = false;
+                    
+                    if let Some(formats) = json.get("formats").and_then(|f| f.as_array()) {
+                        for format in formats {
+                            // Improved audio detection logic
+                            // Check for audio codec that is not "none" or null
+                            if let Some(acodec) = format.get("acodec") {
+                                if let Some(acodec_str) = acodec.as_str() {
+                                    if acodec_str != "none" && !acodec_str.is_empty() {
+                                        has_audio = true;
+                                    }
+                                }
+                            }
+                            
+                            // Also check for audio bitrate as an indicator of audio presence
+                            if let Some(abr) = format.get("abr") {
+                                if abr.as_f64().unwrap_or(0.0) > 0.0 {
+                                    has_audio = true;
+                                }
+                            }
+                            
+                            // Check for audio sample rate
+                            if let Some(asr) = format.get("asr") {
+                                if asr.as_u64().unwrap_or(0) > 0 {
+                                    has_audio = true;
+                                }
+                            }
+                            
+                            // Extract video resolutions - handle both horizontal and vertical videos
+                            if let Some(height) = format.get("height").and_then(|h| h.as_u64()) {
+                                let width = format.get("width").and_then(|w| w.as_u64()).unwrap_or(0);
+                                
+                                // For quality determination, use the smaller dimension for vertical videos
+                                // and height for horizontal videos
+                                let quality_dimension = if width > 0 && height > width {
+                                    // Vertical video: use width as the quality indicator
+                                    width
+                                } else {
+                                    // Horizontal video: use height as the quality indicator
+                                    height
+                                };
+                                
+                                if quality_dimension > max_height {
+                                    max_height = quality_dimension;
+                                }
+                                
+                                let resolution = match quality_dimension {
+                                    2160 => "4K (2160p)".to_string(),
+                                    1440 => "1440p (QHD)".to_string(),
+                                    1080 => "1080p (Full HD)".to_string(),
+                                    720 => "720p (HD)".to_string(),
+                                    480 => "480p (SD)".to_string(),
+                                    360 => "360p".to_string(),
+                                    _ => format!("{}p", quality_dimension),
+                                };
+                                
+                                // Add aspect ratio info for better clarity
+                                let aspect_info = if width > 0 && height > 0 {
+                                    if height > width {
+                                        format!(" ({}x{} Vertical)", width, height)
+                                    } else {
+                                        format!(" ({}x{})", width, height)
+                                    }
+                                } else {
+                                    String::new()
+                                };
+                                
+                                let full_resolution = format!("{}{}", resolution, aspect_info);
+                                
+                                if !available_resolutions.contains(&full_resolution) {
+                                    available_resolutions.push(full_resolution);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Debug output for resolution detection issues
+                    if max_height == 0 {
+                        eprintln!("Warning: No video height detected from formats");
+                    } else {
+                        println!("Detected max resolution: {}p", max_height);
+                    }
+                    
+                    // Additional fallback audio detection methods
+                    if !has_audio {
+                        // Check if there are any audio-only formats
+                        if let Some(formats) = json.get("formats").and_then(|f| f.as_array()) {
+                            for format in formats {
+                                // Check if this is an audio-only format (no video height but has audio codec)
+                                let has_video = format.get("height").is_some();
+                                let has_audio_codec = format.get("acodec")
+                                    .and_then(|a| a.as_str())
+                                    .map(|s| s != "none" && !s.is_empty())
+                                    .unwrap_or(false);
+                                
+                                if !has_video && has_audio_codec {
+                                    has_audio = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Check top-level audio information from yt-dlp
+                        if let Some(duration) = json.get("duration") {
+                            if duration.as_f64().unwrap_or(0.0) > 0.0 {
+                                // If we have duration but no explicit audio detection, 
+                                // assume audio is available for most video content
+                                has_audio = true;
+                            }
+                        }
+                    }
+                    
+                    // Sort resolutions by quality (highest first)
+                    available_resolutions.sort_by(|a, b| {
+                        let height_a = extract_height_from_resolution(a);
+                        let height_b = extract_height_from_resolution(b);
+                        height_b.cmp(&height_a)
+                    });
+                    
+                    let max_resolution = if max_height > 0 {
+                        Some(match max_height {
+                            2160 => "4K (2160p)".to_string(),
+                            1440 => "1440p (QHD)".to_string(),
+                            1080 => "1080p (Full HD)".to_string(),
+                            720 => "720p (HD)".to_string(),
+                            480 => "480p (SD)".to_string(),
+                            360 => "360p".to_string(),
+                            _ => format!("{}p", max_height),
+                        })
+                    } else {
+                        None
+                    };
+                    
+                    let thumbnail = json.get("thumbnail")
+                        .and_then(|t| t.as_str())
+                        .map(|s| s.to_string());
+                    
+                    let response = VideoInfoResponse {
+                        title,
+                        duration,
+                        available_resolutions,
+                        max_resolution,
+                        has_audio,
+                        thumbnail,
+                    };
+                    
+                    Ok(response)
+                } else {
+                    Err("Failed to parse video information".to_string())
+                }
+            } else {
+                let error_msg = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Failed to fetch video info: {}", error_msg))
+            }
+        }
+        Err(e) => Err(format!("Failed to execute yt-dlp: {}", e)),
+    }
+}
+
+fn extract_height_from_resolution(resolution: &str) -> u64 {
+    if resolution.contains("2160") || resolution.contains("4K") {
+        2160
+    } else if resolution.contains("1440") {
+        1440
+    } else if resolution.contains("1080") {
+        1080
+    } else if resolution.contains("720") {
+        720
+    } else if resolution.contains("480") {
+        480
+    } else if resolution.contains("360") {
+        360
+    } else {
+        0
+    }
+}
+
+fn get_settings_path(app: &tauri::AppHandle) -> PathBuf {
+    let app_dir = app.path().app_data_dir().expect("Failed to get app data directory");
+    app_dir.join("settings.json")
+}
+
+#[tauri::command]
+async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, String> {
+    let settings_path = get_settings_path(&app);
+    
+    if settings_path.exists() {
+        match fs::read_to_string(&settings_path) {
+            Ok(content) => {
+                match serde_json::from_str::<AppSettings>(&content) {
+                    Ok(settings) => Ok(settings),
+                    Err(_) => {
+                        // If parsing fails, return default settings
+                        Ok(AppSettings::default())
+                    }
+                }
+            }
+            Err(_) => Ok(AppSettings::default())
+        }
+    } else {
+        // Create default settings file
+        let default_settings = AppSettings::default();
+        let _ = save_settings_to_file(&settings_path, &default_settings).await;
+        Ok(default_settings)
+    }
+}
+
+#[tauri::command]
+async fn set_settings(app: tauri::AppHandle, settings: AppSettings) -> Result<(), String> {
+    let settings_path = get_settings_path(&app);
+    save_settings_to_file(&settings_path, &settings).await
+}
+
+async fn save_settings_to_file(path: &PathBuf, settings: &AppSettings) -> Result<(), String> {
+    // Ensure the parent directory exists
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create settings directory: {}", e))?;
+        }
+    }
+    
+    let json_content = serde_json::to_string_pretty(settings)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+    
+    fs::write(path, json_content)
+        .map_err(|e| format!("Failed to write settings file: {}", e))?;
+    
     Ok(())
 }
 
@@ -1382,6 +1681,7 @@ pub fn run() {
             greet,
             start_download,
             get_video_info,
+            fetch_video_info,
             process_video,
             list_files,
             check_dependencies,
@@ -1396,7 +1696,9 @@ pub fn run() {
             get_video_url,
             generate_thumbnail_data,
             show_in_explorer,
-            get_installation_logs
+            get_installation_logs,
+            get_settings,
+            set_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
