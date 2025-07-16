@@ -48,6 +48,7 @@ pub struct DownloadRequest {
     pub url: String,
     pub format: String,
     pub output_path: String,
+    pub anonymize_filename: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,6 +59,7 @@ pub struct DownloadProgress {
     pub status: String,
     pub filename: Option<String>,
     pub error: Option<String>,
+    pub is_anonymized: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -142,6 +144,7 @@ async fn start_download(
         status: "starting".to_string(),
         filename: None,
         error: None,
+        is_anonymized: Some(request.anonymize_filename),
     };
     
     app.emit("download-progress", &progress)
@@ -173,10 +176,29 @@ async fn execute_download(
         create_hidden_command("yt-dlp")
     };
 
+    // Generate filename based on anonymization setting
+    let filename_pattern = if request.anonymize_filename {
+        // Generate anonymized filename: video_timestamp_random.ext
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let random_string: String = (0..6)
+            .map(|_| {
+                let chars = b"abcdefghijklmnopqrstuvwxyz0123456789";
+                chars[fastrand::usize(..chars.len())] as char
+            })
+            .collect();
+        format!("{}/video_{}_{}.%(ext)s", request.output_path, timestamp, random_string)
+    } else {
+        // Use original video title
+        format!("{}/%(title)s.%(ext)s", request.output_path)
+    };
+
     cmd.arg("--format")
         .arg(&request.format)
         .arg("--output")
-        .arg(format!("{}/%(title)s.%(ext)s", request.output_path))
+        .arg(&filename_pattern)
         .arg("--progress")
         .arg("--no-warnings")
         .arg(&request.url);
@@ -189,6 +211,7 @@ async fn execute_download(
         status: "downloading".to_string(),
         filename: Some("video.mp4".to_string()),
         error: None,
+        is_anonymized: Some(request.anonymize_filename),
     };
     
     let _ = app.emit("download-progress", &progress);
@@ -207,6 +230,7 @@ async fn execute_download(
                 } else { 
                     Some(String::from_utf8_lossy(&output.stderr).to_string()) 
                 },
+                is_anonymized: Some(request.anonymize_filename),
             };
             let _ = app.emit("download-progress", &final_progress);
         }
@@ -218,6 +242,7 @@ async fn execute_download(
                 status: "error".to_string(),
                 filename: None,
                 error: Some(e.to_string()),
+                is_anonymized: Some(request.anonymize_filename),
             };
             let _ = app.emit("download-progress", &error_progress);
         }

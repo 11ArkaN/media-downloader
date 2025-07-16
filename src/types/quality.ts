@@ -31,3 +31,10 @@ export interface VideoInfoResponse {
   has_audio: boolean;
   thumbnail?: string;
 }
+
+export interface DownloadRequest {
+  url: string;
+  format: string;
+  output_path: string;
+  anonymize_filename: boolean;
+}

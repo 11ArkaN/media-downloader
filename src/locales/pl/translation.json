@@ -118,6 +118,8 @@
     "quality_label": "Jakość Wideo",
     "audio_label": "Dołącz Audio",
     "audio_description": "Pobierz ścieżkę audio z wideo",
+    "anonymize_filename_label": "Anonimizuj Nazwę Pliku",
+    "anonymize_filename_description": "Generuj ogólną nazwę pliku dla prywatności",
     "output_folder_label": "Folder Docelowy",
     "output_folder_placeholder": "Wybierz lokalizację pobierania...",
     "start_download_button": "Rozpocznij Pobieranie",
@@ -154,6 +156,7 @@
     "tooltips": {
       "quality_selector": "Wybierz rozdzielczość wideo do pobrania. Wyższe rozdzielczości zapewniają lepszą jakość, ale większe pliki.",
       "audio_toggle": "Dołącz lub wyklucz ścieżkę audio z pobieraniem wideo. Wyłączone dla pobierania tylko audio.",
+      "anonymize_filename_toggle": "Włącz, aby generować ogólne nazwy plików dla ochrony prywatności. Po włączeniu pliki będą nazywane według wzoru 'video_[znacznik_czasu]_[losowy].[rozszerzenie]' zamiast używania oryginalnego tytułu wideo.",
       "quality_4k": "Ultra Wysoka Rozdzielczość - Najlepsza jakość, największy rozmiar pliku",
       "quality_1440p": "Quad HD - Doskonała jakość dla dużych ekranów",
       "quality_1080p": "Full HD - Standardowa wysoka jakość do większości zastosowań",
@@ -173,7 +176,10 @@
       "optimal_recommendation": "Jakości oznaczone jako 'Zalecane' odpowiadają maksymalnej rozdzielczości źródłowego wideo dla optymalnej jakości.",
       "video_information_help_title": "Pomoc informacji o wideo",
       "quality_selection_help_title": "Pomoc wyboru jakości",
-      "audio_settings_help_title": "Pomoc ustawień audio"
+      "audio_settings_help_title": "Pomoc ustawień audio",
+      "filename_anonymization": "Gdy anonimizacja nazw plików jest włączona, pobrane pliki będą używać ogólnych nazw takich jak 'video_1234567890_abc123.mp4' zamiast oryginalnego tytułu wideo. To chroni Twoją prywatność, uniemożliwiając identyfikację treści na podstawie samej nazwy pliku.",
+      "filename_anonymization_help_title": "Pomoc anonimizacji nazw plików",
+      "filename_preview_format": "Pliki będą nazywane: video_[znacznik_czasu]_[losowy].[rozszerzenie]"
     },
     "errors": {
       "invalid_url": "Proszę wprowadzić prawidłowy URL wideo",
@@ -199,7 +205,15 @@
       "quality_fallback_title": "Zmiana jakości",
       "compatibility_warning_title": "Ostrzeżenie kompatybilności",
       "download_started_title": "Rozpoczęto pobieranie",
-      "download_started_message": "Twoje pobieranie zostało dodane do kolejki"
+      "download_started_message": "Twoje pobieranie zostało dodane do kolejki",
+      "filename_anonymized_title": "Nazwa Pliku Zanonimizowana",
+      "filename_anonymized_message": "Plik zostanie zapisany z ogólną nazwą dla prywatności",
+      "anonymization_enabled": "Anonimizacja nazw plików jest włączona",
+      "anonymization_disabled": "Używanie oryginalnej nazwy pliku",
+      "download_with_anonymization_title": "Rozpoczęto pobieranie z anonimizacją",
+      "download_with_anonymization_message": "Twój plik zostanie zapisany z ogólną nazwą pliku dla ochrony prywatności",
+      "download_without_anonymization_title": "Rozpoczęto pobieranie",
+      "download_without_anonymization_message": "Twój plik zostanie zapisany z oryginalnym tytułem wideo jako nazwą pliku"
     },
     "ui": {
       "available": "Dostępne",
@@ -210,7 +224,20 @@
       "choose_file": "Wybierz plik...",
       "error_getting_logs": "Błąd pobierania logów: {{error}}",
       "click_to_select_quality": "Kliknij, aby wybrać jakość {{quality}}",
-      "resolution_cannot_be_mapped": "Ta rozdzielczość nie może być zmapowana na opcję jakości"
+      "resolution_cannot_be_mapped": "Ta rozdzielczość nie może być zmapowana na opcję jakości",
+      "choose_output_folder": "Wybierz gdzie zapisać pobrane pliki. Pozostaw puste, aby użyć domyślnego folderu pobierania.",
+      "browse": "Przeglądaj",
+      "not_applicable": "Nie dotyczy",
+      "audio_included": "Audio dołączone",
+      "video_only": "Tylko wideo",
+      "filename_preview": "Podgląd nazwy pliku:",
+      "original_filename": "Oryginalna nazwa pliku:",
+      "filename_format": "Format: video_[znacznik_czasu]_[losowy].[rozszerzenie]",
+      "uses_original_title": "Używa oryginalnego tytułu wideo jako nazwy pliku",
+      "anonymized_filename_tooltip": "Ten plik zostanie zapisany z zanonimizowaną nazwą dla prywatności",
+      "anonymous": "Anonimowy",
+      "anonymized": "Zanonimizowany",
+      "file_saved_anonymized": "Plik zapisany z zanonimizowaną nazwą"
     }
   },
   "file_explorer": {

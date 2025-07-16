@@ -4235,6 +4235,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
+ "fastrand",
  "futures-util",
  "http-range",
  "lazy_static",

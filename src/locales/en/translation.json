@@ -118,6 +118,8 @@
     "quality_label": "Video Quality",
     "audio_label": "Include Audio",
     "audio_description": "Download audio track with video",
+    "anonymize_filename_label": "Anonymize Filename",
+    "anonymize_filename_description": "Generate generic filename for privacy",
     "output_folder_label": "Output Folder",
     "output_folder_placeholder": "Choose download location...",
     "start_download_button": "Start Download",
@@ -154,6 +156,7 @@
     "tooltips": {
       "quality_selector": "Choose the video resolution for download. Higher resolutions provide better quality but larger file sizes.",
       "audio_toggle": "Include or exclude audio track with video downloads. Disabled for audio-only downloads.",
+      "anonymize_filename_toggle": "Enable to generate generic filenames for privacy protection. When enabled, files will be named with a pattern like 'video_[timestamp]_[random].[extension]' instead of using the original video title.",
       "quality_4k": "Ultra High Definition - Best quality, largest file size",
       "quality_1440p": "Quad HD - Excellent quality for large screens",
       "quality_1080p": "Full HD - Standard high quality for most uses",
@@ -173,7 +176,10 @@
       "optimal_recommendation": "Qualities marked as 'Recommended' match the source video's maximum resolution for optimal quality.",
       "video_information_help_title": "Video Information Help",
       "quality_selection_help_title": "Quality Selection Help",
-      "audio_settings_help_title": "Audio Settings Help"
+      "audio_settings_help_title": "Audio Settings Help",
+      "filename_anonymization": "When filename anonymization is enabled, downloaded files will use generic names like 'video_1234567890_abc123.mp4' instead of the original video title. This protects your privacy by making it impossible to identify the content from the filename alone.",
+      "filename_anonymization_help_title": "Filename Anonymization Help",
+      "filename_preview_format": "Files will be named: video_[timestamp]_[random].[extension]"
     },
     "errors": {
       "invalid_url": "Please enter a valid video URL",
@@ -199,7 +205,15 @@
       "quality_fallback_title": "Quality Fallback",
       "compatibility_warning_title": "Compatibility Warning",
       "download_started_title": "Download Started",
-      "download_started_message": "Your download has been added to the queue"
+      "download_started_message": "Your download has been added to the queue",
+      "filename_anonymized_title": "Filename Anonymized",
+      "filename_anonymized_message": "File will be saved with a generic name for privacy",
+      "anonymization_enabled": "Filename anonymization is enabled",
+      "anonymization_disabled": "Using original filename",
+      "download_with_anonymization_title": "Download Started with Anonymization",
+      "download_with_anonymization_message": "Your file will be saved with a generic filename for privacy protection",
+      "download_without_anonymization_title": "Download Started",
+      "download_without_anonymization_message": "Your file will be saved with the original video title as filename"
     },
     "ui": {
       "available": "Available",
@@ -210,7 +224,20 @@
       "choose_file": "Choose file...",
       "error_getting_logs": "Error getting logs: {{error}}",
       "click_to_select_quality": "Click to select {{quality}} quality",
-      "resolution_cannot_be_mapped": "This resolution cannot be mapped to a quality option"
+      "resolution_cannot_be_mapped": "This resolution cannot be mapped to a quality option",
+      "choose_output_folder": "Choose where to save downloaded files. Leave empty to use default downloads folder.",
+      "browse": "Browse",
+      "not_applicable": "Not applicable",
+      "audio_included": "Audio included",
+      "video_only": "Video only",
+      "filename_preview": "Filename Preview:",
+      "original_filename": "Original Filename:",
+      "filename_format": "Format: video_[timestamp]_[random].[extension]",
+      "uses_original_title": "Uses the original video title as filename",
+      "anonymized_filename_tooltip": "This file will be saved with an anonymized filename for privacy",
+      "anonymous": "Anonymous",
+      "anonymized": "Anonymized",
+      "file_saved_anonymized": "File saved with anonymized filename"
     }
   },
   "file_explorer": {

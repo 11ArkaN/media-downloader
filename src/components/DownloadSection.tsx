@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Download, Play, AlertCircle, Check, Loader2, Link, FolderOpen, Info, Clock, Monitor, HelpCircle, Volume2, VolumeX } from 'lucide-react'
+import { Download, Play, AlertCircle, Check, Loader2, Link, FolderOpen, Info, Clock, Monitor, HelpCircle, Volume2, VolumeX, Shield, ShieldOff } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useTranslation } from 'react-i18next'
-import { VideoInfo, VideoInfoRequest, VideoInfoResponse, AudioSettings } from '../types/quality'
+import { VideoInfo, VideoInfoRequest, VideoInfoResponse, AudioSettings, DownloadRequest } from '../types/quality'
 import { getAllQualityOptions, mapSettingsToQuality, getDefaultAudioSettings, generateFormatString, isAudioOnlyQuality, generateFallbackFormatString, validateFormatString, validateUrl, checkCompatibility, categorizeError, isResolutionAvailable } from '../utils/qualityUtils'
 import Tooltip from './Tooltip'
 import HelpText from './HelpText'
@@ -19,6 +19,7 @@ interface DownloadProgress {
   status: 'pending' | 'starting' | 'downloading' | 'completed' | 'error'
   filename?: string
   error?: string
+  isAnonymized?: boolean
 }
 
 const DownloadSection: React.FC = () => {
@@ -32,7 +33,9 @@ const DownloadSection: React.FC = () => {
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null)
   const [isLoadingVideoInfo, setIsLoadingVideoInfo] = useState(false)
   const [videoInfoError, setVideoInfoError] = useState<string | null>(null)
+  const [anonymizeFilenames, setAnonymizeFilenames] = useState(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [anonymizedDownloads, setAnonymizedDownloads] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     // Listen for download progress events
@@ -42,10 +45,18 @@ const DownloadSection: React.FC = () => {
         const existingIndex = prev.findIndex(d => d.id === progress.id)
         if (existingIndex !== -1) {
           const updated = [...prev]
-          updated[existingIndex] = progress
+          updated[existingIndex] = {
+            ...progress,
+            // Preserve anonymization status if it was set locally
+            isAnonymized: updated[existingIndex].isAnonymized ?? progress.isAnonymized
+          }
           return updated
         } else {
-          return [...prev, progress]
+          return [...prev, {
+            ...progress,
+            // Check if this download was initiated with anonymization
+            isAnonymized: anonymizedDownloads.has(progress.id) || progress.isAnonymized
+          }]
         }
       })
     })
@@ -186,6 +197,7 @@ const DownloadSection: React.FC = () => {
         actualQuality: actualQuality,
         audioSettings,
         outputPath: finalOutputPath,
+        anonymizeFilename: anonymizeFilenames,
         compatibilityWarnings: compatibilityCheck.warnings,
         videoInfo: videoInfo ? {
           title: videoInfo.title,
@@ -194,14 +206,20 @@ const DownloadSection: React.FC = () => {
         } : null
       })
 
-      // Create download request with enhanced format string
-      await invoke('start_download', {
-        request: {
-          url: url.trim(),
-          format: formatString,
-          output_path: finalOutputPath
-        }
-      })
+      // Create download request with enhanced format string and anonymization setting
+      const downloadRequest: DownloadRequest = {
+        url: url.trim(),
+        format: formatString,
+        output_path: finalOutputPath,
+        anonymize_filename: anonymizeFilenames
+      }
+
+      const downloadId = await invoke<string>('start_download', { request: downloadRequest })
+
+      // Track anonymized downloads for proper UI feedback
+      if (anonymizeFilenames && downloadId) {
+        setAnonymizedDownloads(prev => new Set(prev).add(downloadId))
+      }
 
       // Show fallback notification if quality was changed
       if (actualQuality !== selectedQuality) {
@@ -226,11 +244,18 @@ const DownloadSection: React.FC = () => {
         })
       }
 
-      // Show success notification
-      showSuccess(
-        t('download_section.notifications.download_started_title'),
-        t('download_section.notifications.download_started_message')
-      )
+      // Show success notification with anonymization-specific message
+      if (anonymizeFilenames) {
+        showSuccess(
+          t('download_section.notifications.download_with_anonymization_title'),
+          t('download_section.notifications.download_with_anonymization_message')
+        )
+      } else {
+        showSuccess(
+          t('download_section.notifications.download_without_anonymization_title'),
+          t('download_section.notifications.download_without_anonymization_message')
+        )
+      }
 
       // Clear URL after successful download initiation
       setUrl('')
@@ -262,7 +287,8 @@ const DownloadSection: React.FC = () => {
         url: url.trim(),
         progress: 0,
         status: 'error',
-        error: errorMessage
+        error: errorMessage,
+        isAnonymized: anonymizeFilenames
       }
 
       setDownloads(prev => [...prev, errorDownload])
@@ -385,6 +411,26 @@ const DownloadSection: React.FC = () => {
       ...prev,
       includeAudio
     }))
+  }
+
+  // Handle filename anonymization toggle
+  const handleAnonymizeToggle = (anonymize: boolean) => {
+    setAnonymizeFilenames(anonymize)
+    
+    // Show notification to inform user about the change
+    if (anonymize) {
+      showSuccess(
+        t('download_section.notifications.filename_anonymized_title'),
+        t('download_section.notifications.filename_anonymized_message')
+      )
+    }
+  }
+
+  // Generate preview filename for anonymization
+  const generatePreviewFilename = () => {
+    const timestamp = Math.floor(Date.now() / 1000)
+    const randomString = Math.random().toString(36).substring(2, 8)
+    return `video_${timestamp}_${randomString}.mp4`
   }
 
   // Get quality options from configuration
@@ -779,7 +825,7 @@ const DownloadSection: React.FC = () => {
                     {t('download_section.output_folder_label')}
                   </label>
                   <Tooltip
-                    content="Choose where to save downloaded files. Leave empty to use default downloads folder."
+                    content={t('download_section.ui.choose_output_folder')}
                     position="top"
                   >
                     <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-300 cursor-help" />
@@ -801,7 +847,7 @@ const DownloadSection: React.FC = () => {
                     className="glass-button px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-center sm:w-auto w-full"
                   >
                     <FolderOpen className="w-5 h-5" />
-                    <span className="ml-2 sm:hidden">Browse</span>
+                    <span className="ml-2 sm:hidden">{t('download_section.ui.browse')}</span>
                   </motion.button>
                 </div>
               </div>
@@ -903,10 +949,10 @@ const DownloadSection: React.FC = () => {
                     transition={{ duration: 0.2 }}
                   >
                     {!audioSettings.isEnabled
-                      ? 'Not applicable'
+                      ? t('download_section.ui.not_applicable')
                       : audioSettings.includeAudio
-                        ? 'Audio included'
-                        : 'Video only'
+                        ? t('download_section.ui.audio_included')
+                        : t('download_section.ui.video_only')
                     }
                   </motion.span>
                 </div>
@@ -921,6 +967,153 @@ const DownloadSection: React.FC = () => {
                 <HelpText
                   title={t('download_section.help_text.audio_settings_help_title')}
                   content={t('download_section.help_text.audio_inclusion')}
+                  compact={true}
+                />
+              </div>
+            </motion.div>
+
+            {/* Filename Anonymization Toggle */}
+            <motion.div
+              className="space-y-4 p-4 glass-card rounded-xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        id="anonymize-filename"
+                        checked={anonymizeFilenames}
+                        onChange={(e) => handleAnonymizeToggle(e.target.checked)}
+                        className="w-6 h-6 rounded-md border-2 transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 border-gray-400 text-purple-600 bg-transparent hover:border-purple-500 checked:bg-purple-600 checked:border-purple-600"
+                        aria-describedby="anonymize-filename-description"
+                      />
+                      {/* Enhanced visual feedback overlay */}
+                      <motion.div
+                        className={`absolute inset-0 rounded-md pointer-events-none ${anonymizeFilenames ? 'bg-purple-600/20' : 'bg-transparent'}`}
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{
+                          scale: anonymizeFilenames ? 1 : 0.8,
+                          opacity: anonymizeFilenames ? 1 : 0
+                        }}
+                        transition={{ duration: 0.2 }}
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <label
+                        htmlFor="anonymize-filename"
+                        className="text-sm font-medium transition-colors duration-200 text-gray-300 cursor-pointer hover:text-white"
+                      >
+                        {t('download_section.anonymize_filename_label')}
+                      </label>
+
+                      <Tooltip
+                        content={t('download_section.tooltips.anonymize_filename_toggle')}
+                        position="top"
+                      >
+                        <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-300 cursor-help" />
+                      </Tooltip>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Enhanced visual feedback for anonymization state */}
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    className="flex items-center space-x-2"
+                    initial={{ scale: 0.95 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {anonymizeFilenames ? (
+                      <Shield className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <ShieldOff className="w-4 h-4 text-orange-500" />
+                    )}
+
+                    <div className={`w-3 h-3 rounded-full border-2 border-gray-800 transition-all duration-200 ${anonymizeFilenames
+                      ? 'bg-green-500 shadow-green-500/50 shadow-sm'
+                      : 'bg-orange-500 shadow-orange-500/50 shadow-sm'
+                      }`} />
+                  </motion.div>
+
+                  <motion.span
+                    className={`text-sm font-medium transition-colors duration-200 ${anonymizeFilenames
+                      ? 'text-green-400'
+                      : 'text-orange-400'
+                      }`}
+                    key={anonymizeFilenames.toString()}
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {anonymizeFilenames
+                      ? t('download_section.notifications.anonymization_enabled')
+                      : t('download_section.notifications.anonymization_disabled')
+                    }
+                  </motion.span>
+                </div>
+              </div>
+
+              {/* Anonymization description and help */}
+              <div className="space-y-2">
+                <div className="text-sm text-gray-400" id="anonymize-filename-description">
+                  {t('download_section.anonymize_filename_description')}
+                </div>
+
+                {/* Dynamic filename preview */}
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ 
+                    opacity: anonymizeFilenames ? 1 : 0.6, 
+                    height: 'auto' 
+                  }}
+                  className={`text-xs rounded-lg p-3 border transition-all duration-300 ${
+                    anonymizeFilenames 
+                      ? 'bg-blue-800/30 border-blue-600/50 text-blue-100' 
+                      : 'bg-gray-800/30 border-gray-700/50 text-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Info className={`w-3 h-3 ${anonymizeFilenames ? 'text-blue-400' : 'text-gray-500'}`} />
+                    <span className={`font-medium ${anonymizeFilenames ? 'text-blue-400' : 'text-gray-500'}`}>
+                      {anonymizeFilenames ? t('download_section.ui.filename_preview') : t('download_section.ui.original_filename')}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {anonymizeFilenames ? (
+                      <>
+                        <code className="text-blue-200 block">
+                          {generatePreviewFilename()}
+                        </code>
+                        <div className="text-xs text-blue-300/70 mt-1">
+                          {t('download_section.ui.filename_format')}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <code className="text-gray-300 block">
+                          {videoInfo?.title ? 
+                            `${videoInfo.title.substring(0, 50)}${videoInfo.title.length > 50 ? '...' : ''}.mp4` : 
+                            'Original Video Title.mp4'
+                          }
+                        </code>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {t('download_section.ui.uses_original_title')}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Enhanced help text component */}
+                <HelpText
+                  title={t('download_section.help_text.filename_anonymization_help_title')}
+                  content={t('download_section.help_text.filename_anonymization')}
                   compact={true}
                 />
               </div>
@@ -977,9 +1170,34 @@ const DownloadSection: React.FC = () => {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium truncate">{download.url}</p>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-white font-medium truncate">{download.url}</p>
+                          {/* Anonymization status indicator */}
+                          {download.isAnonymized && (
+                            <Tooltip
+                              content={t('download_section.ui.anonymized_filename_tooltip')}
+                              position="top"
+                            >
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="flex items-center space-x-1 px-2 py-1 bg-purple-600/20 border border-purple-500/30 rounded-full"
+                              >
+                                <Shield className="w-3 h-3 text-purple-400" />
+                                <span className="text-xs text-purple-300 font-medium">{t('download_section.ui.anonymous')}</span>
+                              </motion.div>
+                            </Tooltip>
+                          )}
+                        </div>
                         {download.filename && (
-                          <p className="text-gray-400 text-sm">{download.filename}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <p className="text-gray-400 text-sm">{download.filename}</p>
+                            {download.isAnonymized && (
+                              <span className="text-xs text-purple-400 bg-purple-900/30 px-2 py-0.5 rounded">
+                                {t('download_section.ui.anonymized')}
+                              </span>
+                            )}
+                          </div>
                         )}
                         {download.error && (
                           <p className="text-red-400 text-sm">{download.error}</p>
@@ -988,9 +1206,20 @@ const DownloadSection: React.FC = () => {
                     </div>
 
                     <div className="flex items-center space-x-3">
-                      <span className="text-sm text-gray-400">
-                        {Math.round(download.progress)}%
-                      </span>
+                      {/* Enhanced status indicator with anonymization feedback */}
+                      <div className="flex items-center space-x-2">
+                        {download.isAnonymized && (
+                          <Tooltip
+                            content={t('download_section.ui.file_saved_anonymized')}
+                            position="left"
+                          >
+                            <div className="w-2 h-2 bg-purple-500 rounded-full shadow-purple-500/50 shadow-sm" />
+                          </Tooltip>
+                        )}
+                        <span className="text-sm text-gray-400">
+                          {Math.round(download.progress)}%
+                        </span>
+                      </div>
                     </div>
                   </div>
 
