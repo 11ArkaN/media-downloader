@@ -259,8 +259,20 @@
       "type": "Type"
     },
     "sort_order": {
-      "desc": "Newest First",
-      "asc": "Oldest First"
+      "desc": "Descending",
+      "asc": "Ascending"
+    },
+    "sort_order_name": {
+      "asc": "A → Z",
+      "desc": "Z → A"
+    },
+    "sort_order_date": {
+      "asc": "Oldest First",
+      "desc": "Newest First"
+    },
+    "sort_order_size": {
+      "asc": "Smallest First",
+      "desc": "Largest First"
     },
     "filter_options": {
       "all": "All",

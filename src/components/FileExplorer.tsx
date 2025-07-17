@@ -384,6 +384,28 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     onConfirm: () => { }
   })
 
+  // Adaptive labels for sort order
+  const sortOrderLabels = useMemo(() => {
+    switch (sortBy) {
+      case 'name':
+        return {
+          asc: t('file_explorer.sort_order_name.asc'), // A → Z
+          desc: t('file_explorer.sort_order_name.desc') // Z → A
+        }
+      case 'sizeBytes':
+        return {
+          asc: t('file_explorer.sort_order_size.asc'), // Smallest First
+          desc: t('file_explorer.sort_order_size.desc') // Largest First
+        }
+      case 'dateAdded':
+      default:
+        return {
+          asc: t('file_explorer.sort_order_date.asc'), // Oldest First
+          desc: t('file_explorer.sort_order_date.desc') // Newest First
+        }
+    }
+  }, [sortBy, t])
+
   useEffect(() => {
     // Clear thumbnail cache when directory changes
     thumbnailCache.clear()
@@ -596,10 +618,12 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           comparison = a.name.localeCompare(b.name)
           break
         case 'dateAdded':
-          comparison = new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+          // Compare using ascending order by default
+          comparison = new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime()
           break
         case 'sizeBytes':
-          comparison = b.sizeBytes - a.sizeBytes
+          // Compare using ascending order by default
+          comparison = a.sizeBytes - b.sizeBytes
           break
       }
 
@@ -967,8 +991,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
               onChange={(e) => setSortOrder(e.target.value as any)}
               className="w-32 dropdown"
             >
-              <option value="desc">{t('file_explorer.sort_order.desc')}</option>
-              <option value="asc">{t('file_explorer.sort_order.asc')}</option>
+              <option value="desc">{sortOrderLabels.desc}</option>
+              <option value="asc">{sortOrderLabels.asc}</option>
             </select>
           </div>
         </div>
