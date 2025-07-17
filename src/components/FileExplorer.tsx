@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Folder, File, Eye, Edit, Trash2, MoreVertical,
@@ -40,6 +40,45 @@ interface VideoPlayerModalProps {
 
 const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ isOpen, onClose, videoUrl, fileName }) => {
   const { t } = useTranslation()
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const clearMediaSession = () => {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null
+        const actions = ['play', 'pause', 'seekbackward', 'seekforward', 'previoustrack', 'nexttrack'] as const
+        actions.forEach(action => {
+          try {
+            navigator.mediaSession.setActionHandler(action, null)
+          } catch (e) {
+            // Ignore errors
+          }
+        })
+      }
+    }
+
+    if (isOpen) {
+      clearMediaSession()
+      video.addEventListener('play', clearMediaSession)
+      video.addEventListener('loadedmetadata', clearMediaSession)
+      
+      // Programmatically play video
+      video.play().catch(error => {
+        console.error("Autoplay was prevented:", error)
+      });
+    } else {
+      video.pause()
+    }
+
+    return () => {
+      video.removeEventListener('play', clearMediaSession)
+      video.removeEventListener('loadedmetadata', clearMediaSession)
+    }
+  }, [isOpen, videoUrl])
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -88,10 +127,14 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ isOpen, onClose, vi
           </div>
 
           <video
+            ref={videoRef}
             src={videoUrl}
             controls
-            autoPlay
             className="w-full max-h-[70vh] rounded-lg shadow-2xl"
+            controlsList="nodownload nofullscreen noremoteplayback"
+            disablePictureInPicture
+            playsInline
+            data-no-media-session="true"
           />
         </div>
       </motion.div>

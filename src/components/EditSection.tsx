@@ -152,6 +152,34 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
     }
   }, [propSelectedFile])
 
+  // Disable media session for this video element
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const handlePlay = () => {
+      // Clear media session metadata when video starts playing
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null
+      }
+    }
+
+    const handleLoadedMetadata = () => {
+      // Ensure media session stays disabled
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null
+      }
+    }
+
+    video.addEventListener('play', handlePlay)
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+
+    return () => {
+      video.removeEventListener('play', handlePlay)
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+    }
+  }, [videoSrc])
+
   // Apply visual effects to preview
   const applyPreviewEffects = useCallback(() => {
     const video = videoRef.current
@@ -1428,9 +1456,13 @@ const EditSection: React.FC<EditSectionProps> = ({ selectedFile: propSelectedFil
                     <video
                       ref={videoRef}
                       src={videoSrc}
-                    className="w-full h-full object-contain"
+                      className="w-full h-full object-contain"
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
+                      controlsList="nodownload nofullscreen noremoteplayback"
+                      disablePictureInPicture
+                      playsInline
+                      data-no-media-session="true"
                   />
                   <canvas
                     ref={canvasRef}
