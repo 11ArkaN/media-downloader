@@ -7,6 +7,8 @@ import TitleBar from './components/TitleBar'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { NotificationContainer } from './components/NotificationToast'
+import { useNotifications } from './hooks/useNotifications'
 
 type ActiveTab = 'download' | 'edit' | 'files' | 'settings'
 
@@ -38,6 +40,7 @@ function DependencyInstaller({ message }: { message: string }) {
 
 function App() {
   const { t } = useTranslation()
+  const { notifications, dismissNotification } = useNotifications()
   const [activeTab, setActiveTab] = useState<ActiveTab>('download')
   const [selectedVideoFile, setSelectedVideoFile] = useState<string>('')
   const [installMessage, setInstallMessage] = useState('Checking dependencies...')
@@ -148,9 +151,11 @@ function App() {
                 </div>
 
                 {/* Status indicator */}
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-green-400 text-sm font-medium">{t('app.status')}</span>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-green-400 text-sm font-medium">{t('app.status')}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -207,6 +212,13 @@ function App() {
           ))}
         </div>
       </div>
+      
+      {/* Global Notification Container */}
+      <NotificationContainer
+        notifications={notifications}
+        onDismiss={dismissNotification}
+        top="100px"
+      />
     </>
   )
 }

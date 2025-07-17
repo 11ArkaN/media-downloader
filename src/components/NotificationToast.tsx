@@ -117,11 +117,12 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ notification, onD
 interface NotificationContainerProps {
   notifications: Notification[]
   onDismiss: (id: string) => void
+  top?: string
 }
 
-export const NotificationContainer: React.FC<NotificationContainerProps> = ({ notifications, onDismiss }) => {
+export const NotificationContainer: React.FC<NotificationContainerProps> = ({ notifications, onDismiss, top = '100px' }) => {
   return (
-    <div className="fixed right-4 z-50 space-y-3" style={{ top: '116px' }}>
+    <div className="fixed right-4 z-50 space-y-3" style={{ top }}>
       <AnimatePresence mode="popLayout">
         {notifications.map((notification) => (
           <NotificationToast

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Folder, File, Eye, Edit, Trash2, MoreVertical, 
-  Grid, List, Search, RefreshCw, Play, FileVideo, Music, 
-  Image, FolderOpen, ExternalLink, Check
+import {
+  Folder, File, Eye, Edit, Trash2, MoreVertical,
+  Grid, List, Search, RefreshCw, Play, FileVideo, Music,
+  Image, FolderOpen, ExternalLink, Check, Copy
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useTranslation } from 'react-i18next'
-import Portal from './Portal';
+import Portal from './Portal'
+
+import { useNotifications } from '../hooks/useNotifications'
+
 
 interface MediaFile {
   id: string
@@ -83,10 +86,10 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ isOpen, onClose, vi
               <span>{t('file_explorer.video_player_close_button')}</span>
             </button>
           </div>
-          
-          <video 
-            src={videoUrl} 
-            controls 
+
+          <video
+            src={videoUrl}
+            controls
             autoPlay
             className="w-full max-h-[70vh] rounded-lg shadow-2xl"
           />
@@ -99,8 +102,8 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ isOpen, onClose, vi
 // Simple global thumbnail cache
 const thumbnailCache = new Map<string, string>()
 
-const ThumbnailPreview = ({ file, size, generateThumbnail, getFileIcon }: { 
-  file: MediaFile; 
+const ThumbnailPreview = ({ file, size, generateThumbnail, getFileIcon }: {
+  file: MediaFile;
   size: 'sm' | 'md' | 'lg';
   generateThumbnail: (file: MediaFile) => Promise<string | null>;
   getFileIcon: (type: string, size: 'sm' | 'md' | 'lg') => JSX.Element;
@@ -119,11 +122,11 @@ const ThumbnailPreview = ({ file, size, generateThumbnail, getFileIcon }: {
       }
 
       let isMounted = true
-      
+
       const loadThumbnail = async () => {
         setIsLoading(true)
         setLoadError(false)
-        
+
         try {
           const url = await generateThumbnail(file)
           if (isMounted && url) {
@@ -142,9 +145,9 @@ const ThumbnailPreview = ({ file, size, generateThumbnail, getFileIcon }: {
           }
         }
       }
-      
+
       loadThumbnail()
-      
+
       return () => {
         isMounted = false
       }
@@ -208,7 +211,7 @@ const DeleteConfirmationModal: React.FC<{
   getFileIcon: (type: string, size: 'sm' | 'md' | 'lg') => JSX.Element;
 }> = ({ isOpen, files, onConfirm, onCancel, generateThumbnail, getFileIcon }) => {
   const { t } = useTranslation()
-  
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -254,7 +257,7 @@ const DeleteConfirmationModal: React.FC<{
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">
-                {isSingleFile 
+                {isSingleFile
                   ? t('file_explorer.confirm_delete_single')
                   : t('file_explorer.confirm_delete_multiple', { count: files.length })
                 }
@@ -264,15 +267,15 @@ const DeleteConfirmationModal: React.FC<{
               </p>
             </div>
           </div>
-          
+
           <div className="mb-6">
             <div className="bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto hidden-scrollbar">
               {files.slice(0, maxDisplayFiles).map((file) => (
                 <div key={file.id} className="flex items-center space-x-2 py-1">
-                  <ThumbnailPreview 
-                    file={file} 
-                    size="sm" 
-                    generateThumbnail={generateThumbnail} 
+                  <ThumbnailPreview
+                    file={file}
+                    size="sm"
+                    generateThumbnail={generateThumbnail}
                     getFileIcon={getFileIcon}
                   />
                   <span className="text-white text-sm truncate">{file.name}</span>
@@ -297,7 +300,7 @@ const DeleteConfirmationModal: React.FC<{
               onClick={onConfirm}
               className="glass-button bg-red-500/20 hover:bg-red-500/40 border-red-500/30 hover:border-red-500/50 text-red-300 hover:text-red-200 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105"
             >
-              {isSingleFile 
+              {isSingleFile
                 ? t('file_explorer.delete_file')
                 : t('file_explorer.delete_files', { count: files.length })
               }
@@ -311,6 +314,7 @@ const DeleteConfirmationModal: React.FC<{
 
 const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   const { t } = useTranslation()
+  const { showSuccess, showError } = useNotifications()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
@@ -334,7 +338,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   }>({
     isOpen: false,
     files: [],
-    onConfirm: () => {}
+    onConfirm: () => { }
   })
 
   useEffect(() => {
@@ -394,7 +398,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
 
   const getFileType = (filename: string): 'video' | 'audio' | 'image' | 'other' | 'directory' => {
     const ext = filename.split('.').pop()?.toLowerCase()
-    
+
     if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v', '3gp'].includes(ext || '')) return 'video'
     if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'wma'].includes(ext || '')) return 'audio'
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tiff'].includes(ext || '')) return 'image'
@@ -416,7 +420,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
         multiple: false,
         title: t('file_explorer.select_directory_title')
       })
-      
+
       if (selected && typeof selected === 'string') {
         setCurrentDirectory(selected)
       }
@@ -447,11 +451,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   }
 
   const createNewFolder = async () => {
-            const folderName = prompt(t('file_explorer.create_folder_prompt'))
+    const folderName = prompt(t('file_explorer.create_folder_prompt'))
     if (folderName && folderName.trim()) {
       try {
         // Use proper path joining - let the backend handle path separators
-        const newFolderPath = currentDirectory.endsWith('/') || currentDirectory.endsWith('\\') 
+        const newFolderPath = currentDirectory.endsWith('/') || currentDirectory.endsWith('\\')
           ? `${currentDirectory}${folderName.trim()}`
           : `${currentDirectory}/${folderName.trim()}`
         await invoke('create_directory', { directoryPath: newFolderPath })
@@ -494,7 +498,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             await invoke('delete_file', { filePath: file.path })
           }
           await refreshFiles()
-          setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => {} })
+          setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => { } })
         } catch (error) {
           console.error('Error deleting item:', error)
           alert(t('file_explorer.failed_to_delete_file') + error)
@@ -505,7 +509,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
 
   const getFileIcon = (type: string, size: 'sm' | 'md' | 'lg' = 'md') => {
     const iconSize = size === 'sm' ? 'w-4 h-4' : size === 'md' ? 'w-6 h-6' : 'w-8 h-8'
-    
+
     switch (type) {
       case 'directory':
         return <Folder className={`${iconSize} text-yellow-400`} />
@@ -541,9 +545,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       // Always sort directories first
       if (a.type === 'directory' && b.type !== 'directory') return -1
       if (a.type !== 'directory' && b.type === 'directory') return 1
-      
+
       let comparison = 0
-      
+
       switch (sortBy) {
         case 'name':
           comparison = a.name.localeCompare(b.name)
@@ -555,13 +559,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           comparison = b.sizeBytes - a.sizeBytes
           break
       }
-      
+
       return sortOrder === 'asc' ? comparison : -comparison
     })
   }, [files, searchTerm, sortBy, sortOrder, filterType])
 
   const toggleFileSelection = (fileId: string) => {
-    setSelectedFiles(prev => 
+    setSelectedFiles(prev =>
       prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]
     )
   }
@@ -569,14 +573,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   const handleContextMenu = (e: React.MouseEvent, file: MediaFile) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     const menuHeight = 220;
     const menuWidth = 200;
-    
+
     // Get viewport coordinates
     const x = Math.min(e.clientX, window.innerWidth - menuWidth);
     const y = Math.min(e.clientY, window.innerHeight - menuHeight);
-    
+
     const position = y > window.innerHeight - menuHeight ? 'up' : 'down';
 
     setShowContextMenu({ x, y, file, position })
@@ -609,18 +613,18 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   }
 
   const cancelDelete = () => {
-    setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => {} })
+    setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => { } })
   }
 
   const generateThumbnail = async (file: MediaFile): Promise<string | null> => {
     if (file.type !== 'video' && file.type !== 'image') return null
-    
+
     // Check cache first
     const cached = thumbnailCache.get(file.path)
     if (cached) {
       return cached
     }
-    
+
     try {
       // Use the new thumbnail data command that returns base64 data URLs
       const thumbnailDataUrl = await invoke('generate_thumbnail_data', {
@@ -646,9 +650,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
 
   const deleteSelectedFiles = async () => {
     if (selectedFiles.length === 0) return
-    
+
     const selectedFileObjects = selectedFiles.map(id => files.find(f => f.id === id)).filter(Boolean) as MediaFile[]
-    
+
     setDeleteConfirmation({
       isOpen: true,
       files: selectedFileObjects,
@@ -659,7 +663,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           }
           setSelectedFiles([])
           await refreshFiles()
-          setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => {} })
+          setDeleteConfirmation({ isOpen: false, files: [], onConfirm: () => { } })
         } catch (error) {
           console.error('Error deleting files:', error)
           alert(t('file_explorer.failed_to_delete_files') + error)
@@ -672,7 +676,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     const selectedVideoFiles = selectedFiles
       .map(id => files.find(f => f.id === id))
       .filter(file => file && file.type === 'video')
-    
+
     if (selectedVideoFiles.length === 0) {
       alert(t('file_explorer.no_videos_selected'))
       return
@@ -688,7 +692,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     const selectedFileObjects = selectedFiles
       .map(id => files.find(f => f.id === id))
       .filter(Boolean)
-    
+
     if (selectedFileObjects.length === 0) return
 
     try {
@@ -696,6 +700,16 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       await invoke('show_in_explorer', { filePath: selectedFileObjects[0]!.path })
     } catch (err) {
       console.error("Failed to show in folder:", err)
+    }
+  }
+
+  const copyFileToClipboard = async (file: MediaFile) => {
+    try {
+      await invoke('copy_file_to_clipboard', { filePath: file.path })
+      showSuccess(t('file_explorer.copy_success'), `${file.name}`)
+    } catch (error) {
+      console.error('Error copying file to clipboard:', error)
+      showError(t('file_explorer.copy_failed'), `${file.name}`)
     }
   }
 
@@ -723,7 +737,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
                 {t('file_explorer.selection_count', { count: selectedFiles.length })}
               </span>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
                 onClick={selectAllFiles}
@@ -793,7 +807,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     >
       <AnimatePresence>
         {selectedFiles.includes(file.id) && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
@@ -803,12 +817,12 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {viewMode === 'grid' ? (
         <>
-          <ThumbnailPreview 
-            file={file} 
-            size="lg" 
+          <ThumbnailPreview
+            file={file}
+            size="lg"
             generateThumbnail={generateThumbnail}
             getFileIcon={getFileIcon}
           />
@@ -819,9 +833,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
         </>
       ) : (
         <>
-          <ThumbnailPreview 
-            file={file} 
-            size="md" 
+          <ThumbnailPreview
+            file={file}
+            size="md"
             generateThumbnail={generateThumbnail}
             getFileIcon={getFileIcon}
           />
@@ -935,7 +949,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       <h3 className="mt-4 text-xl font-semibold text-white">{t('file_explorer.no_files_found')}</h3>
     </div>
   );
-  
+
   const renderLoadingState = () => (
     <div className="text-center py-20">
       <RefreshCw className="mx-auto w-24 h-24 text-gray-600 animate-spin" />
@@ -969,9 +983,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
         {showContextMenu && (
           <div
             className="context-menu"
-            style={{ 
+            style={{
               position: 'fixed',
-              left: showContextMenu.x, 
+              left: showContextMenu.x,
               top: showContextMenu.y,
               zIndex: 9999
             }}
@@ -1010,6 +1024,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
                 <span>{t('file_explorer.file_actions.show_in_folder')}</span>
               </div>
             </button>
+            {showContextMenu.file.type !== 'directory' && (
+              <button onClick={() => { copyFileToClipboard(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
+                <div className="flex items-center space-x-2 text-gray-400">
+                  <Copy className="w-4 h-4" />
+                  <span>{t('file_explorer.file_actions.copy_to_clipboard')}</span>
+                </div>
+              </button>
+            )}
             <div className="h-[1px] bg-gray-700 my-1"></div>
             {showContextMenu.file.type === 'video' && onSelectVideo && (
               <button onClick={() => { editFile(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
@@ -1022,7 +1044,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             <button onClick={() => { deleteFile(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
               <div className="flex items-center space-x-2 text-red-400">
                 <Trash2 className="w-4 h-4" />
-                <span>{showContextMenu.file.type === 'directory' 
+                <span>{showContextMenu.file.type === 'directory'
                   ? t('file_explorer.file_actions.delete_folder')
                   : t('file_explorer.file_actions.delete')}
                 </span>
@@ -1047,8 +1069,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <button 
-            onClick={navigateBack} 
+          <button
+            onClick={navigateBack}
             disabled={directoryHistory.length <= 1}
             className={`glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform ${directoryHistory.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
@@ -1065,7 +1087,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           </button>
         </div>
       </div>
-      
+
       {/* Breadcrumb Navigation */}
       <div className="bg-gray-800/50 rounded-lg p-3 mb-4">
         <div className="flex items-center space-x-2 text-sm">
@@ -1079,9 +1101,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
                   setDirectoryHistory(newHistory)
                   setCurrentDirectory(dir)
                 }}
-                className={`text-gray-300 hover:text-white transition-colors ${
-                  index === directoryHistory.length - 1 ? 'font-semibold text-white' : 'hover:underline'
-                }`}
+                className={`text-gray-300 hover:text-white transition-colors ${index === directoryHistory.length - 1 ? 'font-semibold text-white' : 'hover:underline'
+                  }`}
               >
                 {dir === './downloads' ? 'Downloads' : dir.split('/').pop() || dir}
               </button>
@@ -1089,13 +1110,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           ))}
         </div>
       </div>
-      
+
       <AnimatePresence>
         {renderSelectionToolbar()}
       </AnimatePresence>
-      
+
       {renderToolbar()}
-      
+
       <div className="mt-6">
         {isLoading ? renderLoadingState() : (
           filteredAndSortedFiles.length === 0 ? renderEmptyState() : (
@@ -1105,9 +1126,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       </div>
 
       {renderContextMenu()}
-      
+
       <Portal>
-        <VideoPlayerModal 
+        <VideoPlayerModal
           isOpen={videoPlayer.isOpen}
           onClose={closeVideoPlayer}
           videoUrl={videoPlayer.videoUrl}
@@ -1116,7 +1137,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       </Portal>
 
       <Portal>
-        <DeleteConfirmationModal 
+        <DeleteConfirmationModal
           isOpen={deleteConfirmation.isOpen}
           files={deleteConfirmation.files}
           onConfirm={deleteConfirmation.onConfirm}
@@ -1125,6 +1146,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           getFileIcon={getFileIcon}
         />
       </Portal>
+
+
     </div>
   )
 }

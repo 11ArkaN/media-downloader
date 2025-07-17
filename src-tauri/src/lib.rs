@@ -1565,6 +1565,121 @@ async fn show_in_explorer(file_path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
+    let path = std::path::PathBuf::from(&file_path);
+    
+    if !path.exists() {
+        return Err("File does not exist".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Use PowerShell to copy file to clipboard on Windows
+        let powershell_script = format!(
+            "Set-Clipboard -Path '{}'", 
+            path.to_string_lossy().replace("'", "''")
+        );
+        
+        let result = Command::new("powershell")
+            .args(["-Command", &powershell_script])
+            .output();
+        
+        match result {
+            Ok(output) => {
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    let error = String::from_utf8_lossy(&output.stderr);
+                    Err(format!("Failed to copy file to clipboard: {}", error))
+                }
+            }
+            Err(e) => Err(format!("Failed to execute PowerShell command: {}", e))
+        }
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        // Use osascript to copy file to clipboard on macOS
+        let applescript = format!(
+            "tell application \"Finder\" to set the clipboard to (POSIX file \"{}\")",
+            path.to_string_lossy()
+        );
+        
+        let result = Command::new("osascript")
+            .args(["-e", &applescript])
+            .output();
+            
+        match result {
+            Ok(output) => {
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    let error = String::from_utf8_lossy(&output.stderr);
+                    Err(format!("Failed to copy file to clipboard: {}", error))
+                }
+            }
+            Err(e) => Err(format!("Failed to execute AppleScript: {}", e))
+        }
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // Use xclip to copy file path to clipboard on Linux
+        // First try to copy as file URI
+        let file_uri = format!("file://{}", path.to_string_lossy());
+        
+        let result = Command::new("xclip")
+            .args(["-selection", "clipboard", "-t", "text/uri-list"])
+            .arg("-i")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                if let Some(stdin) = child.stdin.as_mut() {
+                    stdin.write_all(file_uri.as_bytes())?;
+                }
+                child.wait()
+            });
+            
+        match result {
+            Ok(status) => {
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err("Failed to copy file to clipboard".to_string())
+                }
+            }
+            Err(_) => {
+                // Fallback: try copying just the file path as text
+                let result = Command::new("xclip")
+                    .args(["-selection", "clipboard"])
+                    .arg("-i")
+                    .stdin(std::process::Stdio::piped())
+                    .spawn()
+                    .and_then(|mut child| {
+                        use std::io::Write;
+                        if let Some(stdin) = child.stdin.as_mut() {
+                            stdin.write_all(path.to_string_lossy().as_bytes())?;
+                        }
+                        child.wait()
+                    });
+                
+                match result {
+                    Ok(status) => {
+                        if status.success() {
+                            Ok(())
+                        } else {
+                            Err("Failed to copy file path to clipboard".to_string())
+                        }
+                    }
+                    Err(e) => Err(format!("xclip not available: {}", e))
+                }
+            }
+        }
+    }
+}
+
 fn get_yt_dlp_command() -> String {
     // Try system-wide yt-dlp first
     if create_hidden_command("yt-dlp").arg("--version").output().is_ok() {
@@ -1721,6 +1836,7 @@ pub fn run() {
             get_video_url,
             generate_thumbnail_data,
             show_in_explorer,
+            copy_file_to_clipboard,
             get_installation_logs,
             get_settings,
             set_settings

@@ -113,7 +113,7 @@
   "download_section": {
     "title": "Pobierz Media",
     "url_label": "URL Wideo",
-    "url_placeholder": "Wklej link z YouTube, Vimeo, lub inny obsługiwany...",
+    "url_placeholder": "Wklej link z YouTube, Twitter, lub inny obsługiwany...",
     "format_label": "Format",
     "quality_label": "Jakość Wideo",
     "audio_label": "Dołącz Audio",
@@ -279,7 +279,8 @@
       "delete_folder": "Usuń folder",
       "play_in_app": "Odtwórz w aplikacji",
       "open_external": "Otwórz aplikacją systemową",
-      "open_folder": "Otwórz folder"
+      "open_folder": "Otwórz folder",
+      "copy_to_clipboard": "Kopiuj plik"
     },
     "current_directory": "Bieżący Folder",
     "change_directory_button": "Zmień",
@@ -304,7 +305,9 @@
     "delete_file": "Usuń",
     "delete_files": "Usuń {{count}} Plików",
     "show_in_folder": "Pokaż w folderze",
-    "failed_to_start_video_player": "Nie udało się uruchomić odtwarzacza wideo."
+    "failed_to_start_video_player": "Nie udało się uruchomić odtwarzacza wideo.",
+    "copy_success": "Plik skopiowany",
+    "copy_failed": "Nieudało się skopiować pliku"
   },
   "editSection": {
     "videoLibrary": {

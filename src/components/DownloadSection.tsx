@@ -9,8 +9,9 @@ import { VideoInfo, VideoInfoRequest, VideoInfoResponse, AudioSettings, Download
 import { getAllQualityOptions, mapSettingsToQuality, getDefaultAudioSettings, generateFormatString, isAudioOnlyQuality, generateFallbackFormatString, validateFormatString, validateUrl, checkCompatibility, categorizeError, isResolutionAvailable } from '../utils/qualityUtils'
 import Tooltip from './Tooltip'
 import HelpText from './HelpText'
-import { NotificationContainer } from './NotificationToast'
+
 import { useNotifications } from '../hooks/useNotifications'
+
 
 interface DownloadProgress {
   id: string
@@ -24,7 +25,7 @@ interface DownloadProgress {
 
 const DownloadSection: React.FC = () => {
   const { t } = useTranslation()
-  const { notifications, dismissNotification, showSuccess, showWarning } = useNotifications()
+  const { showSuccess, showWarning } = useNotifications()
   const [url, setUrl] = useState('')
   const [downloads, setDownloads] = useState<DownloadProgress[]>([])
   const [selectedQuality, setSelectedQuality] = useState('1080p')
@@ -416,7 +417,7 @@ const DownloadSection: React.FC = () => {
   // Handle filename anonymization toggle
   const handleAnonymizeToggle = (anonymize: boolean) => {
     setAnonymizeFilenames(anonymize)
-    
+
     // Show notification to inform user about the change
     if (anonymize) {
       showSuccess(
@@ -445,21 +446,21 @@ const DownloadSection: React.FC = () => {
   // Function to map available resolution strings to quality option values
   const mapResolutionToQuality = (resolution: string): string | null => {
     const resolutionLower = resolution.toLowerCase()
-    
+
     // Extract numeric resolution from various formats
     // Handle formats like "720p (HD)", "1080p (Full HD)", "720p (HD) (720x1280 Vertical)", etc.
     const heightMatch = resolution.match(/(\d+)p/)
     if (heightMatch) {
       const height = heightMatch[1]
       const qualityValue = `${height}p`
-      
+
       // Check if this quality value exists in our quality options
       const qualityOption = qualityOptions.find(option => option.value === qualityValue)
       if (qualityOption) {
         return qualityValue
       }
     }
-    
+
     // Handle descriptive quality names
     if (resolutionLower.includes('4k') || resolutionLower.includes('uhd') || resolutionLower.includes('2160')) {
       return '2160p'
@@ -482,7 +483,7 @@ const DownloadSection: React.FC = () => {
     if (resolutionLower.includes('320')) {
       return '320p'
     }
-    
+
     return null
   }
 
@@ -496,10 +497,6 @@ const DownloadSection: React.FC = () => {
 
   return (
     <>
-      <NotificationContainer
-        notifications={notifications}
-        onDismiss={dismissNotification}
-      />
       <div className="space-y-6">
         {/* Download Form */}
         <motion.div
@@ -650,19 +647,18 @@ const DownloadSection: React.FC = () => {
                             const qualityValue = mapResolutionToQuality(resolution)
                             const isCurrentlySelected = qualityValue === selectedQuality
                             const isClickable = qualityValue !== null
-                            
+
                             return (
                               <motion.button
                                 key={index}
                                 onClick={() => isClickable && handleResolutionClick(resolution)}
                                 disabled={!isClickable}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${
-                                  isCurrentlySelected
-                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-400/50 shadow-lg shadow-purple-500/25'
-                                    : isClickable
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${isCurrentlySelected
+                                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-400/50 shadow-lg shadow-purple-500/25'
+                                  : isClickable
                                     ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-gray-300 border-gray-600/50 hover:border-gray-500/50 hover:from-gray-600 hover:to-gray-500 cursor-pointer'
                                     : 'bg-gradient-to-r from-gray-800 to-gray-700 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60'
-                                }`}
+                                  }`}
                                 whileHover={isClickable ? { scale: 1.05 } : {}}
                                 whileTap={isClickable ? { scale: 0.95 } : {}}
                                 transition={{ duration: 0.1 }}
@@ -1068,15 +1064,14 @@ const DownloadSection: React.FC = () => {
                 {/* Dynamic filename preview */}
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
-                  animate={{ 
-                    opacity: anonymizeFilenames ? 1 : 0.6, 
-                    height: 'auto' 
+                  animate={{
+                    opacity: anonymizeFilenames ? 1 : 0.6,
+                    height: 'auto'
                   }}
-                  className={`text-xs rounded-lg p-3 border transition-all duration-300 ${
-                    anonymizeFilenames 
-                      ? 'bg-blue-800/30 border-blue-600/50 text-blue-100' 
-                      : 'bg-gray-800/30 border-gray-700/50 text-gray-400'
-                  }`}
+                  className={`text-xs rounded-lg p-3 border transition-all duration-300 ${anonymizeFilenames
+                    ? 'bg-blue-800/30 border-blue-600/50 text-blue-100'
+                    : 'bg-gray-800/30 border-gray-700/50 text-gray-400'
+                    }`}
                 >
                   <div className="flex items-center space-x-2 mb-2">
                     <Info className={`w-3 h-3 ${anonymizeFilenames ? 'text-blue-400' : 'text-gray-500'}`} />
@@ -1097,8 +1092,8 @@ const DownloadSection: React.FC = () => {
                     ) : (
                       <>
                         <code className="text-gray-300 block">
-                          {videoInfo?.title ? 
-                            `${videoInfo.title.substring(0, 50)}${videoInfo.title.length > 50 ? '...' : ''}.mp4` : 
+                          {videoInfo?.title ?
+                            `${videoInfo.title.substring(0, 50)}${videoInfo.title.length > 50 ? '...' : ''}.mp4` :
                             'Original Video Title.mp4'
                           }
                         </code>

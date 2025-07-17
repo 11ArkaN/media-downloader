@@ -113,7 +113,7 @@
   "download_section": {
     "title": "Download Media",
     "url_label": "Video URL",
-    "url_placeholder": "Paste YouTube, Vimeo, or other supported URL...",
+    "url_placeholder": "Paste YouTube, Twitter, or other supported URL...",
     "format_label": "Format",
     "quality_label": "Video Quality",
     "audio_label": "Include Audio",
@@ -279,7 +279,8 @@
       "delete_folder": "Delete Folder",
       "play_in_app": "Play in App",
       "open_external": "Open with system app",
-      "open_folder": "Open Folder"
+      "open_folder": "Open Folder",
+      "copy_to_clipboard": "Copy to Clipboard"
     },
     "current_directory": "Current Directory",
     "change_directory_button": "Change",
@@ -304,7 +305,9 @@
     "delete_file": "Delete",
     "delete_files": "Delete {{count}} Files",
     "show_in_folder": "Show in Folder",
-    "failed_to_start_video_player": "Failed to start video player."
+    "failed_to_start_video_player": "Failed to start video player.",
+    "copy_success": "File copied to clipboard",
+    "copy_failed": "Failed to copy file to clipboard"
   },
   "editSection": {
     "videoLibrary": {
