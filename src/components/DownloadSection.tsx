@@ -23,6 +23,11 @@ interface DownloadProgress {
   isAnonymized?: boolean
 }
 
+interface PersistedAppSettings {
+  default_quality: string
+  download_path: string
+}
+
 const DownloadSection: React.FC = () => {
   const { t } = useTranslation()
   const { showSuccess, showWarning } = useNotifications()
@@ -71,23 +76,19 @@ const DownloadSection: React.FC = () => {
     }
   }, [])
 
-  // Load default quality from settings on component mount
+  // Load persisted download defaults on component mount
   useEffect(() => {
-    const loadDefaultQuality = async () => {
+    const loadDownloadDefaults = async () => {
       try {
-        const settings = await invoke('get_settings')
-        if (settings && typeof settings === 'object' && 'default_quality' in settings) {
-          const defaultQuality = (settings as any).default_quality
-          const mappedQuality = mapSettingsToQuality(defaultQuality)
-          setSelectedQuality(mappedQuality)
-        }
+        const settings = await invoke<PersistedAppSettings>('get_settings')
+        setSelectedQuality(mapSettingsToQuality(settings.default_quality))
+        setOutputPath(settings.download_path || '')
       } catch (error) {
-        console.error('Error loading default quality from settings:', error)
-        // Keep default 1080p if settings can't be loaded
+        console.error('Error loading download defaults:', error)
       }
     }
 
-    loadDefaultQuality()
+    loadDownloadDefaults()
   }, [])
 
   const selectOutputPath = async () => {
@@ -297,8 +298,13 @@ const DownloadSection: React.FC = () => {
   }
 
   const getDefaultDownloadPath = async () => {
-    // Try to get default downloads folder or use current directory
-    return './downloads'
+    try {
+      const settings = await invoke<PersistedAppSettings>('get_settings')
+      return settings.download_path || './downloads'
+    } catch (error) {
+      console.error('Error loading default download path:', error)
+      return './downloads'
+    }
   }
 
   const fetchVideoInfo = async (videoUrl: string) => {

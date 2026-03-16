@@ -12,24 +12,29 @@ interface DependencyInfo {
   ffmpeg_installed: boolean
 }
 
+interface PersistedAppSettings {
+  default_quality: string
+  download_path: string
+}
+
+const defaultSettings = {
+  downloadPath: './downloads',
+  maxConcurrentDownloads: 3,
+  defaultQuality: 'best',
+  theme: 'dark',
+  language: '',
+  autostart: false,
+  notifications: true,
+  ytdlpPath: 'auto',
+  ffmpegPath: 'auto',
+  customArgs: ''
+}
+
 const SettingsSection: React.FC = () => {
   const { t, i18n } = useTranslation()
   const [settings, setSettings] = useState({
-    // Download Settings
-    downloadPath: './downloads',
-    maxConcurrentDownloads: 3,
-    defaultQuality: 'best',
-    
-    // App Settings
-    theme: 'dark',
-    language: i18n.language,
-    autostart: false,
-    notifications: true,
-    
-    // Advanced Settings
-    ytdlpPath: 'auto',
-    ffmpegPath: 'auto',
-    customArgs: ''
+    ...defaultSettings,
+    language: i18n.language
   })
 
   const [dependencies, setDependencies] = useState<DependencyInfo | null>(null)
@@ -44,20 +49,45 @@ const SettingsSection: React.FC = () => {
     checkDependencies()
   }, [])
 
+  const getLocalSettings = () => {
+    const savedSettings = localStorage.getItem('media-downloader-settings')
+
+    if (!savedSettings) {
+      return null
+    }
+
+    const parsedSettings = JSON.parse(savedSettings)
+
+    if (parsedSettings.defaultQuality) {
+      parsedSettings.defaultQuality = migrateQualityValue(parsedSettings.defaultQuality)
+    }
+
+    return parsedSettings
+  }
+
   const loadSettings = async () => {
     try {
-      // In a real app, this would load from a config file or database
-      const savedSettings = localStorage.getItem('media-downloader-settings')
-      if (savedSettings) {
-        const parsedSettings = JSON.parse(savedSettings)
-        
-        // Migration logic for existing settings values to new resolution system
-        if (parsedSettings.defaultQuality) {
-          const migratedQuality = migrateQualityValue(parsedSettings.defaultQuality)
-          parsedSettings.defaultQuality = migratedQuality
-        }
-        
-        setSettings({ ...settings, ...parsedSettings })
+      const localSettings = getLocalSettings()
+      const persistedSettings = await invoke<PersistedAppSettings>('get_settings')
+
+      const mergedSettings = {
+        ...defaultSettings,
+        language: i18n.language,
+        ...localSettings,
+        defaultQuality: localSettings?.defaultQuality ?? migrateQualityValue(persistedSettings.default_quality),
+        downloadPath: localSettings?.downloadPath ?? persistedSettings.download_path ?? defaultSettings.downloadPath
+      }
+
+      setSettings(mergedSettings)
+
+      // Migrate existing browser-only values into the backend settings file once.
+      if (localSettings?.defaultQuality || localSettings?.downloadPath) {
+        await invoke('set_settings', {
+          settings: {
+            default_quality: mergedSettings.defaultQuality,
+            download_path: mergedSettings.downloadPath
+          }
+        })
       }
     } catch (error) {
       console.error('Error loading settings:', error)
@@ -91,8 +121,13 @@ const SettingsSection: React.FC = () => {
   const saveSettings = async () => {
     setIsSaving(true)
     try {
-      // In a real app, this would save to a config file
       localStorage.setItem('media-downloader-settings', JSON.stringify(settings))
+      await invoke('set_settings', {
+        settings: {
+          default_quality: settings.defaultQuality,
+          download_path: settings.downloadPath || defaultSettings.downloadPath
+        }
+      })
       
       // Show success message
       setTimeout(() => setIsSaving(false), 1000)
@@ -117,7 +152,7 @@ const SettingsSection: React.FC = () => {
   const selectPath = async (settingKey: string) => {
     try {
       const selected = await open({
-        directory: settingKey.includes('Path') && !settingKey.includes('download'),
+        directory: settingKey === 'downloadPath',
         multiple: false,
         title: `Select ${settingKey.replace(/([A-Z])/g, ' $1').toLowerCase()}`
       })

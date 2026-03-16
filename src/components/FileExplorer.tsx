@@ -21,6 +21,7 @@ interface MediaFile {
   duration?: string
   path: string
   dateAdded: string
+  modifiedTimestamp: number
   sizeBytes: number
   extension: string
   isDirectory?: boolean
@@ -448,6 +449,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           sizeBytes: file.size,
           path: file.path,
           dateAdded: new Date(file.modified * 1000).toLocaleDateString(),
+          modifiedTimestamp: file.modified,
           extension: file.is_directory ? '' : (file.name.split('.').pop()?.toLowerCase() || ''),
           isDirectory: file.is_directory
         }
@@ -613,15 +615,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
 
       let comparison = 0
 
-      switch (sortBy) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name)
+        switch (sortBy) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name)
+            break
+          case 'dateAdded':
+          comparison = a.modifiedTimestamp - b.modifiedTimestamp
           break
-        case 'dateAdded':
-          // Compare using ascending order by default
-          comparison = new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime()
-          break
-        case 'sizeBytes':
+          case 'sizeBytes':
           // Compare using ascending order by default
           comparison = a.sizeBytes - b.sizeBytes
           break
@@ -726,7 +727,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       onConfirm: async () => {
         try {
           for (const file of selectedFileObjects) {
-            await invoke('delete_file', { filePath: file.path })
+            if (file.type === 'directory') {
+              await invoke('delete_directory', { directoryPath: file.path })
+            } else {
+              await invoke('delete_file', { filePath: file.path })
+            }
           }
           setSelectedFiles([])
           await refreshFiles()

@@ -1,43 +1,44 @@
-use http_range::HttpRange;
-use serde::{Deserialize, Serialize};
-use std::process::Command;
-use std::path::PathBuf;
-use tauri::{Emitter, Manager};
 use anyhow::Result;
-use uuid::Uuid;
-use std::sync::{Arc, LazyLock};
-use tokio::sync::Mutex;
-use warp::Filter;
-use warp::http::{header, StatusCode};
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
+use http_range::HttpRange;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::copy;
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::{Arc, LazyLock};
+use tauri::{Emitter, Manager};
+use tokio::sync::Mutex;
+use uuid::Uuid;
+use warp::http::{header, StatusCode};
+use warp::Filter;
 use zip::ZipArchive;
 
 fn create_hidden_command(program: &str) -> Command {
     let mut cmd = Command::new(program);
-    
+
     // Hide command window on Windows
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    
+
     cmd
 }
 
 fn create_hidden_command_with_path(path: &std::path::Path) -> Command {
     let mut cmd = Command::new(path);
-    
+
     // Hide command window on Windows
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    
+
     cmd
 }
 
@@ -110,15 +111,27 @@ pub struct GithubRelease {
     pub assets: Vec<ReleaseAsset>,
 }
 
+fn default_quality() -> String {
+    "1080p".to_string()
+}
+
+fn default_download_path() -> String {
+    "./downloads".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
+    #[serde(default = "default_quality")]
     pub default_quality: String,
+    #[serde(default = "default_download_path")]
+    pub download_path: String,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            default_quality: "1080p".to_string(),
+            default_quality: default_quality(),
+            download_path: default_download_path(),
         }
     }
 }
@@ -130,12 +143,9 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn start_download(
-    app: tauri::AppHandle,
-    request: DownloadRequest,
-) -> Result<String, String> {
+async fn start_download(app: tauri::AppHandle, request: DownloadRequest) -> Result<String, String> {
     let download_id = Uuid::new_v4().to_string();
-    
+
     // Emit initial progress
     let progress = DownloadProgress {
         id: download_id.clone(),
@@ -146,14 +156,14 @@ async fn start_download(
         error: None,
         is_anonymized: Some(request.anonymize_filename),
     };
-    
+
     app.emit("download-progress", &progress)
         .map_err(|e| e.to_string())?;
 
     // Start download in background
     let app_clone = app.clone();
     let download_id_clone = download_id.clone();
-    
+
     tauri::async_runtime::spawn(async move {
         if let Err(e) = execute_download(app_clone, download_id_clone, request).await {
             eprintln!("Download error: {}", e);
@@ -189,16 +199,33 @@ async fn execute_download(
                 chars[fastrand::usize(..chars.len())] as char
             })
             .collect();
-        format!("{}/video_{}_{}.%(ext)s", request.output_path, timestamp, random_string)
+        format!(
+            "{}/video_{}_{}.%(ext)s",
+            request.output_path, timestamp, random_string
+        )
     } else {
         // Use original video title
         format!("{}/%(title)s.%(ext)s", request.output_path)
     };
 
+    // If we're using a managed ffmpeg, point yt-dlp to it explicitly so post-processing works
+    if get_ffmpeg_command() == "managed" {
+        let ffmpeg_path = get_ffmpeg_path(&app);
+        if ffmpeg_path.exists() {
+            cmd.arg("--ffmpeg-location").arg(ffmpeg_path);
+        }
+    }
+
     cmd.arg("--format")
         .arg(&request.format)
         .arg("--output")
         .arg(&filename_pattern)
+        // Ensure final files are universally shareable (Messenger-safe): MP4 container,
+        // H.264 video + AAC audio, yuv420p pixel format, and moov atom at start
+        .arg("--recode-video")
+        .arg("mp4")
+        .arg("--postprocessor-args")
+        .arg("ffmpeg:-c:v libx264 -c:a aac -movflags +faststart -pix_fmt yuv420p")
         .arg("--progress")
         .arg("--no-warnings")
         .arg(&request.url);
@@ -213,7 +240,7 @@ async fn execute_download(
         error: None,
         is_anonymized: Some(request.anonymize_filename),
     };
-    
+
     let _ = app.emit("download-progress", &progress);
 
     // Execute the command (simplified for demo)
@@ -223,12 +250,16 @@ async fn execute_download(
                 id: download_id,
                 url: request.url,
                 progress: 100.0,
-                status: if output.status.success() { "completed".to_string() } else { "error".to_string() },
+                status: if output.status.success() {
+                    "completed".to_string()
+                } else {
+                    "error".to_string()
+                },
                 filename: Some("video.mp4".to_string()),
-                error: if output.status.success() { 
-                    None 
-                } else { 
-                    Some(String::from_utf8_lossy(&output.stderr).to_string()) 
+                error: if output.status.success() {
+                    None
+                } else {
+                    Some(String::from_utf8_lossy(&output.stderr).to_string())
                 },
                 is_anonymized: Some(request.anonymize_filename),
             };
@@ -274,51 +305,57 @@ async fn get_video_info(app: tauri::AppHandle, file_path: String) -> Result<Medi
             if output.status.success() {
                 // Try to parse real ffprobe output, fallback to basic info
                 let output_str = String::from_utf8_lossy(&output.stdout);
-                
+
                 // Basic file info
                 let filename = PathBuf::from(&file_path)
                     .file_name()
                     .unwrap_or_default()
                     .to_string_lossy()
                     .to_string();
-                
+
                 let size = std::fs::metadata(&file_path)
                     .map(|meta| meta.len())
                     .unwrap_or(0);
-                
+
                 // Try to extract info from JSON output
-                let (duration, resolution, format) = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output_str) {
-                    let duration = json.get("format")
+                let (duration, resolution, format) = if let Ok(json) =
+                    serde_json::from_str::<serde_json::Value>(&output_str)
+                {
+                    let duration = json
+                        .get("format")
                         .and_then(|f| f.get("duration"))
                         .and_then(|d| d.as_str())
                         .and_then(|d| d.parse::<f64>().ok())
                         .map(|d| format!("{:02}:{:02}", (d as u64) / 60, (d as u64) % 60));
-                    
-                    let video_stream = json.get("streams")
-                        .and_then(|s| s.as_array())
-                        .and_then(|streams| streams.iter().find(|s| 
-                            s.get("codec_type").and_then(|c| c.as_str()) == Some("video")
-                        ));
-                    
-                    let resolution = video_stream
-                        .and_then(|s| {
-                            let width = s.get("width")?.as_u64()?;
-                            let height = s.get("height")?.as_u64()?;
-                            Some(format!("{}x{}", width, height))
-                        });
-                    
-                    let format = json.get("format")
+
+                    let video_stream =
+                        json.get("streams")
+                            .and_then(|s| s.as_array())
+                            .and_then(|streams| {
+                                streams.iter().find(|s| {
+                                    s.get("codec_type").and_then(|c| c.as_str()) == Some("video")
+                                })
+                            });
+
+                    let resolution = video_stream.and_then(|s| {
+                        let width = s.get("width")?.as_u64()?;
+                        let height = s.get("height")?.as_u64()?;
+                        Some(format!("{}x{}", width, height))
+                    });
+
+                    let format = json
+                        .get("format")
                         .and_then(|f| f.get("format_name"))
                         .and_then(|f| f.as_str())
                         .unwrap_or("Unknown")
                         .to_uppercase();
-                    
+
                     (duration, resolution, format)
                 } else {
                     // Fallback values
                     (None, None, "Unknown".to_string())
                 };
-                
+
                 let info = MediaInfo {
                     filename,
                     duration,
@@ -336,16 +373,13 @@ async fn get_video_info(app: tauri::AppHandle, file_path: String) -> Result<Medi
 }
 
 #[tauri::command]
-async fn process_video(
-    app: tauri::AppHandle,
-    request: EditRequest,
-) -> Result<String, String> {
+async fn process_video(app: tauri::AppHandle, request: EditRequest) -> Result<String, String> {
     let process_id = Uuid::new_v4().to_string();
-    
+
     // Start processing in background
     let app_clone = app.clone();
     let process_id_clone = process_id.clone();
-    
+
     tauri::async_runtime::spawn(async move {
         if let Err(e) = execute_video_processing(app_clone, process_id_clone, request).await {
             eprintln!("Processing error: {}", e);
@@ -371,10 +405,14 @@ async fn execute_video_processing(
     // Disable fontconfig to avoid configuration errors on Windows
     cmd.env("FONTCONFIG_FILE", "");
     cmd.env("FONTCONFIG_PATH", "");
-    
+
+    // Check if the input video has audio streams using ffprobe
+    let has_audio = check_video_has_audio(&app, &request.input_path).await.unwrap_or(false);
+    println!("Input video has audio: {}", has_audio);
+
     // Collect all trim operations to handle multiple segments
     let mut trim_operations: Vec<(f64, f64)> = Vec::new();
-    
+
     for operation in &request.operations {
         if operation.operation_type == "trim" {
             if let Some(start) = operation.params.get("start").and_then(|v| v.as_f64()) {
@@ -384,33 +422,63 @@ async fn execute_video_processing(
             }
         }
     }
-    
+
     cmd.arg("-i").arg(&request.input_path);
-    
+
     // Handle multiple trim segments using select filter
     let mut trim_filters = Vec::new();
     if !trim_operations.is_empty() {
         for (i, (start, end)) in trim_operations.iter().enumerate() {
             let duration = end - start;
-            trim_filters.push(format!("[0:v]trim=start={}:duration={},setpts=PTS-STARTPTS[v{}]", start, duration, i));
-            trim_filters.push(format!("[0:a]atrim=start={}:duration={},asetpts=PTS-STARTPTS[a{}]", start, duration, i));
+            // Always add video trim filter
+            trim_filters.push(format!(
+                "[0:v]trim=start={}:duration={},setpts=PTS-STARTPTS[v{}]",
+                start, duration, i
+            ));
+            
+            // Only add audio trim filter if the video has audio
+            if has_audio {
+                trim_filters.push(format!(
+                    "[0:a]atrim=start={}:duration={},asetpts=PTS-STARTPTS[a{}]",
+                    start, duration, i
+                ));
+            }
         }
-        
+
         // Concatenate all segments if multiple
         if trim_operations.len() > 1 {
-            let concat_inputs: String = (0..trim_operations.len())
-                .map(|i| format!("[v{}][a{}]", i, i))
-                .collect();
-            trim_filters.push(format!("{}concat=n={}:v=1:a=1[trimmed_v][trimmed_a]", concat_inputs, trim_operations.len()));
+            if has_audio {
+                let concat_inputs: String = (0..trim_operations.len())
+                    .map(|i| format!("[v{}][a{}]", i, i))
+                    .collect();
+                trim_filters.push(format!(
+                    "{}concat=n={}:v=1:a=1[trimmed_v][trimmed_a]",
+                    concat_inputs,
+                    trim_operations.len()
+                ));
+            } else {
+                let concat_inputs: String = (0..trim_operations.len())
+                    .map(|i| format!("[v{}]", i))
+                    .collect();
+                trim_filters.push(format!(
+                    "{}concat=n={}:v=1[trimmed_v]",
+                    concat_inputs,
+                    trim_operations.len()
+                ));
+            }
         } else {
-            trim_filters.push("[v0][a0]concat=n=1:v=1:a=1[trimmed_v][trimmed_a]".to_string());
+            if has_audio {
+                trim_filters.push("[v0][a0]concat=n=1:v=1:a=1[trimmed_v][trimmed_a]".to_string());
+            } else {
+                trim_filters.push("[v0]concat=n=1:v=1[trimmed_v]".to_string());
+            }
         }
     }
 
     // Build filter complex for video operations
     let mut video_filters = Vec::new();
     let mut audio_filters = Vec::new();
-    
+
     for operation in &request.operations {
         match operation.operation_type.as_str() {
             "trim" => {
@@ -420,39 +488,70 @@ async fn execute_video_processing(
             "crop" => {
                 if let Some(x) = operation.params.get("x").and_then(|v| v.as_f64()) {
                     if let Some(y) = operation.params.get("y").and_then(|v| v.as_f64()) {
-                        if let Some(width) = operation.params.get("width").and_then(|v| v.as_f64()) {
-                            if let Some(height) = operation.params.get("height").and_then(|v| v.as_f64()) {
-                                video_filters.push(format!("crop={}:{}:{}:{}", width, height, x, y));
+                        if let Some(width) = operation.params.get("width").and_then(|v| v.as_f64())
+                        {
+                            if let Some(height) =
+                                operation.params.get("height").and_then(|v| v.as_f64())
+                            {
+                                video_filters
+                                    .push(format!("crop={}:{}:{}:{}", width, height, x, y));
                             }
                         }
                     }
                 }
             }
             "filter" => {
-                if let Some(filter_type) = operation.params.get("filterType").and_then(|v| v.as_str()) {
+                if let Some(filter_type) =
+                    operation.params.get("filterType").and_then(|v| v.as_str())
+                {
                     let filter = match filter_type {
                         "blur" => {
-                            let intensity = operation.params.get("intensity").and_then(|v| v.as_f64()).unwrap_or(2.0);
+                            let intensity = operation
+                                .params
+                                .get("intensity")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(2.0);
                             format!("boxblur={}:1", intensity)
-                        },
+                        }
                         "sharpen" => {
-                            let intensity = operation.params.get("intensity").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                            let intensity = operation
+                                .params
+                                .get("intensity")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(1.0);
                             format!("unsharp=5:5:{}:5:5:0.0", intensity)
-                        },
+                        }
                         "brightness" => {
-                            let intensity = operation.params.get("intensity").and_then(|v| v.as_f64()).unwrap_or(0.2);
+                            let intensity = operation
+                                .params
+                                .get("intensity")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(0.2);
                             format!("eq=brightness={}", intensity)
-                        },
+                        }
                         "contrast" => {
-                            let intensity = operation.params.get("intensity").and_then(|v| v.as_f64()).unwrap_or(1.5);
+                            let intensity = operation
+                                .params
+                                .get("intensity")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(1.5);
                             format!("eq=contrast={}", intensity)
-                        },
+                        }
                         "saturation" => {
-                            let intensity = operation.params.get("intensity").and_then(|v| v.as_f64()).unwrap_or(1.5);
+                            let intensity = operation
+                                .params
+                                .get("intensity")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(1.5);
                             format!("eq=saturation={}", intensity)
-                        },
-                        "grayscale" => "colorchannelmixer=.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3".to_string(),
-                        "sepia" => "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131".to_string(),
+                        }
+                        "grayscale" => {
+                            "colorchannelmixer=.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3".to_string()
+                        }
+                        "sepia" => {
+                            "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"
+                                .to_string()
+                        }
                         "vintage" => "curves=vintage".to_string(),
                         "invert" => "negate".to_string(),
                         _ => continue,
@@ -483,10 +582,13 @@ async fn execute_video_processing(
             }
             "fade" => {
                 if let Some(fade_type) = operation.params.get("fadeType").and_then(|v| v.as_str()) {
-                    if let Some(duration) = operation.params.get("duration").and_then(|v| v.as_f64()) {
+                    if let Some(duration) =
+                        operation.params.get("duration").and_then(|v| v.as_f64())
+                    {
                         match fade_type {
                             "in" => video_filters.push(format!("fade=t=in:st=0:d={}", duration)),
-                            "out" => video_filters.push(format!("fade=t=out:st={}:d={}", duration, duration)),
+                            "out" => video_filters
+                                .push(format!("fade=t=out:st={}:d={}", duration, duration)),
                             _ => {}
                         }
                     }
@@ -494,28 +596,93 @@ async fn execute_video_processing(
             }
             "text" => {
                 if let Some(text) = operation.params.get("text").and_then(|v| v.as_str()) {
-                    let x = operation.params.get("x").and_then(|v| v.as_f64()).unwrap_or(50.0);
-                    let y = operation.params.get("y").and_then(|v| v.as_f64()).unwrap_or(50.0);
-                    let font_size = operation.params.get("fontSize").and_then(|v| v.as_f64()).unwrap_or(24.0);
-                    let color = operation.params.get("color").and_then(|v| v.as_str()).unwrap_or("#ffffff");
-                    let font_family = operation.params.get("fontFamily").and_then(|v| v.as_str()).unwrap_or("Arial");
-                    let start_time = operation.params.get("startTime").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    let duration = operation.params.get("duration").and_then(|v| v.as_f64()).unwrap_or(5.0);
-                    
+                    let x = operation
+                        .params
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(50.0);
+                    let y = operation
+                        .params
+                        .get("y")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(50.0);
+                    let font_size = operation
+                        .params
+                        .get("fontSize")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(24.0);
+                    let color = operation
+                        .params
+                        .get("color")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("#ffffff");
+                    let font_family = operation
+                        .params
+                        .get("fontFamily")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Arial");
+                    let start_time = operation
+                        .params
+                        .get("startTime")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    let duration = operation
+                        .params
+                        .get("duration")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(5.0);
+
                     // Convert percentage position to relative positioning
-                    let x_pos = if x <= 100.0 { format!("(w-text_w)*{}/100", x) } else { x.to_string() };
-                    let y_pos = if y <= 100.0 { format!("(h-text_h)*{}/100", y) } else { y.to_string() };
-                    
+                    let x_pos = if x <= 100.0 {
+                        format!("(w-text_w)*{}/100", x)
+                    } else {
+                        x.to_string()
+                    };
+                    let y_pos = if y <= 100.0 {
+                        format!("(h-text_h)*{}/100", y)
+                    } else {
+                        y.to_string()
+                    };
+
                     // If text is empty after filtering, skip this operation
                     if text.trim().is_empty() {
                         continue;
                     }
-                    
-                    // On Windows, specifying a font file directly is more reliable than relying on fontconfig.
-                    // NOTE: This assumes fonts are in C:/Windows/Fonts and have a .ttf extension.
-                    // Using forward slashes is generally safer for ffmpeg paths.
-                    let font_path = format!("C:/Windows/Fonts/{}.ttf", font_family);
-                    
+
+                    // Detect if text contains possible emoji / symbols often missing from basic fonts.
+                    let has_emoji = text.chars().any(|c| {
+                        let cp = c as u32;
+                        // Common emoji ranges + misc symbols (includes hearts 2764 etc.)
+                        (0x1F300..=0x1FAFF).contains(&cp) || // Misc Symbols & Pictographs, Supplemental Symbols and Pictographs
+                        (0x1F1E6..=0x1F1FF).contains(&cp) || // Regional Indicator (flags)
+                        (0x2600..=0x27BF).contains(&cp) ||   // Misc symbols / dingbats (hearts, stars, etc.)
+                        (0x1F900..=0x1F9FF).contains(&cp)
+                    });
+
+                    // Map friendly font family names to actual Windows font file names.
+                    let mapped_font_file = match font_family.to_lowercase().as_str() {
+                        // Explicit emoji-capable fonts
+                        "segoe ui emoji" => Some("seguiemj.ttf"),
+                        "segoe ui symbol" => Some("seguisym.ttf"),
+                        "segoe ui" => Some("segoeui.ttf"),
+                        // Arial Unicode MS (if present) provides broader coverage
+                        "arial unicode ms" => Some("arialuni.ttf"),
+                        _ => None,
+                    };
+
+                    // Choose a font path:
+                    // 1. If user explicitly chose a mapped font, use it.
+                    // 2. If emoji are detected and user kept default/likely unsupported font, switch to Segoe UI Emoji (Windows color emoji font).
+                    // 3. Fallback: use provided family name verbatim with .ttf extension.
+                    let font_path = if let Some(file) = mapped_font_file {
+                        format!("C:/Windows/Fonts/{}", file)
+                    } else if has_emoji && font_family.eq_ignore_ascii_case("Arial") {
+                        // Auto-upgrade to emoji-capable font so hearts etc. render instead of squares.
+                        "C:/Windows/Fonts/seguiemj.ttf".to_string()
+                    } else {
+                        format!("C:/Windows/Fonts/{}.ttf", font_family)
+                    };
+
                     // Escape special characters for ffmpeg's filter syntax.
                     // The path needs to have colons and backslashes escaped for ffmpeg's parser.
                     let escaped_font_path = font_path.replace("\\", "\\\\").replace(":", "\\:");
@@ -533,10 +700,15 @@ async fn execute_video_processing(
                     } else {
                         color.to_string()
                     };
-                    
+
+                    // Quote font path and text so spaces and special chars are handled correctly by ffmpeg.
+                    // Since we pass args directly (no shell), single quotes are preserved for ffmpeg's parser.
+                    // Add a default outline similar to canvas preview strokeText for readability.
+                    let stroke_width = (font_size / 12.0).max(1.0).round() as i32; // parallels preview logic
+                    let stroke_color = "0x000000"; // solid black
                     let text_filter = format!(
-                        "drawtext=fontfile={}:text={}:fontsize={}:fontcolor={}:x={}:y={}:enable='between(t,{},{})'",
-                        escaped_font_path, escaped_text, font_size, escaped_color, x_pos, y_pos, start_time, start_time + duration
+                        "drawtext=fontfile='{}':text='{}':fontsize={}:fontcolor={}:borderw={}:bordercolor={}:x={}:y={}:enable='between(t,{},{})'",
+                        escaped_font_path, escaped_text, font_size, escaped_color, stroke_width, stroke_color, x_pos, y_pos, start_time, start_time + duration
                     );
                     video_filters.push(text_filter);
                 }
@@ -544,107 +716,181 @@ async fn execute_video_processing(
             _ => {} // Unknown operation type
         }
     }
-    
+
     // Combine all filters into a complex filter graph
     let mut all_filters = Vec::new();
-    
+
     // Add trim filters first
     all_filters.extend(trim_filters);
-    
+
     // Process other video filters on the trimmed output
     if !video_filters.is_empty() {
-        let input_label = if trim_operations.is_empty() { "[0:v]" } else { "[trimmed_v]" };
+        let input_label = if trim_operations.is_empty() {
+            "[0:v]"
+        } else {
+            "[trimmed_v]"
+        };
         let combined_video_filter = format!("{}[final_v]", video_filters.join(","));
         all_filters.push(format!("{}{}", input_label, combined_video_filter));
     }
-    
-    // Process audio filters on the trimmed output
-    if !audio_filters.is_empty() {
-        let input_label = if trim_operations.is_empty() { "[0:a]" } else { "[trimmed_a]" };
+
+    // Process audio filters on the trimmed output (only if video has audio)
+    if has_audio && !audio_filters.is_empty() {
+        let input_label = if trim_operations.is_empty() {
+            "[0:a]"
+        } else {
+            "[trimmed_a]"
+        };
         let combined_audio_filter = format!("{}[final_a]", audio_filters.join(","));
         all_filters.push(format!("{}{}", input_label, combined_audio_filter));
     }
-    
+
     // Apply the complex filter if we have any filters
     if !all_filters.is_empty() {
         cmd.arg("-filter_complex").arg(all_filters.join(";"));
-        
+
         // Map the outputs
         if !video_filters.is_empty() || !trim_operations.is_empty() {
-            let video_output = if !video_filters.is_empty() { "[final_v]" } else { "[trimmed_v]" };
+            let video_output = if !video_filters.is_empty() {
+                "[final_v]"
+            } else {
+                "[trimmed_v]"
+            };
             cmd.arg("-map").arg(video_output);
         } else {
             cmd.arg("-map").arg("0:v");
         }
-        
-        // Always map audio stream (either filtered or original)
-        if !audio_filters.is_empty() || !trim_operations.is_empty() {
-            let audio_output = if !audio_filters.is_empty() { "[final_a]" } else { "[trimmed_a]" };
-            cmd.arg("-map").arg(audio_output);
-        } else {
-            // Map original audio stream if no audio processing
-            cmd.arg("-map").arg("0:a");
+
+        // Map audio stream only if the input video has audio
+        if has_audio {
+            if !audio_filters.is_empty() || !trim_operations.is_empty() {
+                let audio_output = if !audio_filters.is_empty() {
+                    "[final_a]"
+                } else {
+                    "[trimmed_a]"
+                };
+                cmd.arg("-map").arg(audio_output);
+            } else {
+                // Map original audio stream if no audio processing
+                cmd.arg("-map").arg("0:a");
+            }
         }
     } else {
         // No filters at all, map streams directly
-        cmd.arg("-map").arg("0:v").arg("-map").arg("0:a");
+        cmd.arg("-map").arg("0:v");
+        if has_audio {
+            cmd.arg("-map").arg("0:a");
+        }
     }
 
-    // Add codec and output settings to prevent crashes
-    cmd.arg("-c:v").arg("libx264")  // Explicitly specify video codec
-        .arg("-c:a").arg("aac")     // Explicitly specify audio codec
-        .arg("-y").arg(&request.output_path);
+    // Add codec and output settings for broad compatibility (Messenger-safe)
+    cmd.arg("-c:v").arg("libx264");
+    
+    // Only add audio codec if the input has audio
+    if has_audio {
+        cmd.arg("-c:a").arg("aac");
+    }
+    
+    cmd.arg("-pix_fmt")
+        .arg("yuv420p")
+        .arg("-movflags")
+        .arg("+faststart")
+        .arg("-y")
+        .arg(&request.output_path);
 
     // Debug: Print the full command
     println!("FFmpeg command: {:?}", cmd);
 
     // Emit processing progress
-    let _ = app.emit("processing-progress", serde_json::json!({
-        "id": process_id,
-        "progress": 50.0,
-        "status": "processing"
-    }));
+    let _ = app.emit(
+        "processing-progress",
+        serde_json::json!({
+            "id": process_id,
+            "progress": 50.0,
+            "status": "processing"
+        }),
+    );
 
     // Execute the command
     match cmd.output() {
         Ok(output) => {
             let stderr_output = String::from_utf8_lossy(&output.stderr).to_string();
-            
+
             // Check if this is just a fontconfig warning (not a real error)
-            let is_fontconfig_warning = stderr_output.contains("Fontconfig error") 
-                && output.status.success();
-            
+            let is_fontconfig_warning =
+                stderr_output.contains("Fontconfig error") && output.status.success();
+
             // Log the command output for debugging
             println!("FFmpeg stderr: {}", stderr_output);
             println!("FFmpeg exit status: {}", output.status);
-            
-            let _ = app.emit("processing-progress", serde_json::json!({
-                "id": process_id,
-                "progress": 100.0,
-                "status": if output.status.success() { "completed" } else { "error" },
-                "error": if output.status.success() { 
-                    // Don't report fontconfig warnings as errors
-                    if is_fontconfig_warning {
-                        None::<String>
+
+            let _ = app.emit(
+                "processing-progress",
+                serde_json::json!({
+                    "id": process_id,
+                    "progress": 100.0,
+                    "status": if output.status.success() { "completed" } else { "error" },
+                    "error": if output.status.success() {
+                        // Don't report fontconfig warnings as errors
+                        if is_fontconfig_warning {
+                            None::<String>
+                        } else {
+                            None::<String>
+                        }
                     } else {
-                        None::<String>
+                        Some(stderr_output)
                     }
-                } else { 
-                    Some(stderr_output) 
-                }
-            }));
+                }),
+            );
         }
         Err(e) => {
-            let _ = app.emit("processing-progress", serde_json::json!({
-                "id": process_id,
-                "progress": 0.0,
-                "status": "error",
-                "error": e.to_string()
-            }));
+            let _ = app.emit(
+                "processing-progress",
+                serde_json::json!({
+                    "id": process_id,
+                    "progress": 0.0,
+                    "status": "error",
+                    "error": e.to_string()
+                }),
+            );
         }
     }
 
     Ok(())
+}
+
+async fn check_video_has_audio(app: &tauri::AppHandle, file_path: &str) -> Result<bool> {
+    let ffprobe_cmd = get_ffprobe_command();
+    let mut cmd = if ffprobe_cmd == "managed" {
+        let ffprobe_path = get_ffprobe_path(app);
+        create_hidden_command_with_path(&ffprobe_path)
+    } else {
+        create_hidden_command("ffprobe")
+    };
+
+    cmd.arg("-v")
+        .arg("quiet")
+        .arg("-print_format")
+        .arg("json")
+        .arg("-show_streams")
+        .arg("-select_streams")
+        .arg("a")
+        .arg(file_path);
+
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output_str) {
+                    if let Some(streams) = json.get("streams").and_then(|s| s.as_array()) {
+                        return Ok(!streams.is_empty());
+                    }
+                }
+            }
+            Ok(false)
+        }
+        Err(_) => Ok(false),
+    }
 }
 
 #[tauri::command]
@@ -670,26 +916,25 @@ async fn fetch_video_info(
         Ok(output) => {
             if output.status.success() {
                 let output_str = String::from_utf8_lossy(&output.stdout);
-                
+
                 // Parse yt-dlp JSON output
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output_str) {
-                    let title = json.get("title")
+                    let title = json
+                        .get("title")
                         .and_then(|t| t.as_str())
                         .map(|s| s.to_string());
-                    
-                    let duration = json.get("duration")
-                        .and_then(|d| d.as_f64())
-                        .map(|d| {
-                            let minutes = (d as u64) / 60;
-                            let seconds = (d as u64) % 60;
-                            format!("{:02}:{:02}", minutes, seconds)
-                        });
-                    
+
+                    let duration = json.get("duration").and_then(|d| d.as_f64()).map(|d| {
+                        let minutes = (d as u64) / 60;
+                        let seconds = (d as u64) % 60;
+                        format!("{:02}:{:02}", minutes, seconds)
+                    });
+
                     // Extract available formats and resolutions
                     let mut available_resolutions = Vec::new();
                     let mut max_height = 0u64;
                     let mut has_audio = false;
-                    
+
                     if let Some(formats) = json.get("formats").and_then(|f| f.as_array()) {
                         for format in formats {
                             // Improved audio detection logic
@@ -701,25 +946,26 @@ async fn fetch_video_info(
                                     }
                                 }
                             }
-                            
+
                             // Also check for audio bitrate as an indicator of audio presence
                             if let Some(abr) = format.get("abr") {
                                 if abr.as_f64().unwrap_or(0.0) > 0.0 {
                                     has_audio = true;
                                 }
                             }
-                            
+
                             // Check for audio sample rate
                             if let Some(asr) = format.get("asr") {
                                 if asr.as_u64().unwrap_or(0) > 0 {
                                     has_audio = true;
                                 }
                             }
-                            
+
                             // Extract video resolutions - handle both horizontal and vertical videos
                             if let Some(height) = format.get("height").and_then(|h| h.as_u64()) {
-                                let width = format.get("width").and_then(|w| w.as_u64()).unwrap_or(0);
-                                
+                                let width =
+                                    format.get("width").and_then(|w| w.as_u64()).unwrap_or(0);
+
                                 // For quality determination, use the smaller dimension for vertical videos
                                 // and height for horizontal videos
                                 let quality_dimension = if width > 0 && height > width {
@@ -729,11 +975,11 @@ async fn fetch_video_info(
                                     // Horizontal video: use height as the quality indicator
                                     height
                                 };
-                                
+
                                 if quality_dimension > max_height {
                                     max_height = quality_dimension;
                                 }
-                                
+
                                 let resolution = match quality_dimension {
                                     2160 => "4K (2160p)".to_string(),
                                     1440 => "1440p (QHD)".to_string(),
@@ -743,7 +989,7 @@ async fn fetch_video_info(
                                     360 => "360p".to_string(),
                                     _ => format!("{}p", quality_dimension),
                                 };
-                                
+
                                 // Add aspect ratio info for better clarity
                                 let aspect_info = if width > 0 && height > 0 {
                                     if height > width {
@@ -754,23 +1000,23 @@ async fn fetch_video_info(
                                 } else {
                                     String::new()
                                 };
-                                
+
                                 let full_resolution = format!("{}{}", resolution, aspect_info);
-                                
+
                                 if !available_resolutions.contains(&full_resolution) {
                                     available_resolutions.push(full_resolution);
                                 }
                             }
                         }
                     }
-                    
+
                     // Debug output for resolution detection issues
                     if max_height == 0 {
                         eprintln!("Warning: No video height detected from formats");
                     } else {
                         println!("Detected max resolution: {}p", max_height);
                     }
-                    
+
                     // Additional fallback audio detection methods
                     if !has_audio {
                         // Check if there are any audio-only formats
@@ -778,35 +1024,36 @@ async fn fetch_video_info(
                             for format in formats {
                                 // Check if this is an audio-only format (no video height but has audio codec)
                                 let has_video = format.get("height").is_some();
-                                let has_audio_codec = format.get("acodec")
+                                let has_audio_codec = format
+                                    .get("acodec")
                                     .and_then(|a| a.as_str())
                                     .map(|s| s != "none" && !s.is_empty())
                                     .unwrap_or(false);
-                                
+
                                 if !has_video && has_audio_codec {
                                     has_audio = true;
                                     break;
                                 }
                             }
                         }
-                        
+
                         // Check top-level audio information from yt-dlp
                         if let Some(duration) = json.get("duration") {
                             if duration.as_f64().unwrap_or(0.0) > 0.0 {
-                                // If we have duration but no explicit audio detection, 
+                                // If we have duration but no explicit audio detection,
                                 // assume audio is available for most video content
                                 has_audio = true;
                             }
                         }
                     }
-                    
+
                     // Sort resolutions by quality (highest first)
                     available_resolutions.sort_by(|a, b| {
                         let height_a = extract_height_from_resolution(a);
                         let height_b = extract_height_from_resolution(b);
                         height_b.cmp(&height_a)
                     });
-                    
+
                     let max_resolution = if max_height > 0 {
                         Some(match max_height {
                             2160 => "4K (2160p)".to_string(),
@@ -820,11 +1067,12 @@ async fn fetch_video_info(
                     } else {
                         None
                     };
-                    
-                    let thumbnail = json.get("thumbnail")
+
+                    let thumbnail = json
+                        .get("thumbnail")
                         .and_then(|t| t.as_str())
                         .map(|s| s.to_string());
-                    
+
                     let response = VideoInfoResponse {
                         title,
                         duration,
@@ -833,7 +1081,7 @@ async fn fetch_video_info(
                         has_audio,
                         thumbnail,
                     };
-                    
+
                     Ok(response)
                 } else {
                     Err("Failed to parse video information".to_string())
@@ -866,14 +1114,17 @@ fn extract_height_from_resolution(resolution: &str) -> u64 {
 }
 
 fn get_settings_path(app: &tauri::AppHandle) -> PathBuf {
-    let app_dir = app.path().app_data_dir().expect("Failed to get app data directory");
+    let app_dir = app
+        .path()
+        .app_data_dir()
+        .expect("Failed to get app data directory");
     app_dir.join("settings.json")
 }
 
 #[tauri::command]
 async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, String> {
     let settings_path = get_settings_path(&app);
-    
+
     if settings_path.exists() {
         match fs::read_to_string(&settings_path) {
             Ok(content) => {
@@ -885,7 +1136,7 @@ async fn get_settings(app: tauri::AppHandle) -> Result<AppSettings, String> {
                     }
                 }
             }
-            Err(_) => Ok(AppSettings::default())
+            Err(_) => Ok(AppSettings::default()),
         }
     } else {
         // Create default settings file
@@ -905,29 +1156,29 @@ async fn save_settings_to_file(path: &PathBuf, settings: &AppSettings) -> Result
     // Ensure the parent directory exists
     if let Some(parent) = path.parent() {
         if !parent.exists() {
-            fs::create_dir_all(parent).map_err(|e| format!("Failed to create settings directory: {}", e))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create settings directory: {}", e))?;
         }
     }
-    
+
     let json_content = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-    
-    fs::write(path, json_content)
-        .map_err(|e| format!("Failed to write settings file: {}", e))?;
-    
+
+    fs::write(path, json_content).map_err(|e| format!("Failed to write settings file: {}", e))?;
+
     Ok(())
 }
 
 #[tauri::command]
 async fn list_files(directory: String) -> Result<Vec<serde_json::Value>, String> {
     let path = PathBuf::from(&directory);
-    
+
     if !path.exists() {
         return Err("Directory does not exist".to_string());
     }
 
     let mut items = Vec::new();
-    
+
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
             if let Ok(metadata) = entry.metadata() {
@@ -965,31 +1216,34 @@ async fn list_files(directory: String) -> Result<Vec<serde_json::Value>, String>
 #[tauri::command]
 async fn delete_file(file_path: String) -> Result<(), String> {
     let path = PathBuf::from(&file_path);
-    
+
     if !path.exists() {
         return Err("File does not exist".to_string());
     }
-    
+
     match std::fs::remove_file(&path) {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to delete file: {}", e))
+        Err(e) => Err(format!("Failed to delete file: {}", e)),
     }
 }
 
 #[tauri::command]
 async fn open_file(file_path: String) -> Result<(), String> {
     let path = PathBuf::from(&file_path);
-    
+
     if !path.exists() {
         return Err("File does not exist".to_string());
     }
 
     #[cfg(target_os = "windows")]
     {
-        let result = Command::new("cmd")
-            .args(["/C", "start", "", &file_path])
-            .output();
-        
+        // Use hidden command to avoid flashing console window
+        let result = {
+            let mut cmd = create_hidden_command("cmd");
+            cmd.args(["/C", "start", "", &file_path]);
+            cmd.output()
+        };
+
         match result {
             Ok(output) => {
                 if output.status.success() {
@@ -998,16 +1252,14 @@ async fn open_file(file_path: String) -> Result<(), String> {
                     Err("Failed to open file".to_string())
                 }
             }
-            Err(e) => Err(format!("Failed to open file: {}", e))
+            Err(e) => Err(format!("Failed to open file: {}", e)),
         }
     }
-    
+
     #[cfg(target_os = "macos")]
     {
-        let result = Command::new("open")
-            .arg(&file_path)
-            .output();
-            
+        let result = Command::new("open").arg(&file_path).output();
+
         match result {
             Ok(output) => {
                 if output.status.success() {
@@ -1016,16 +1268,14 @@ async fn open_file(file_path: String) -> Result<(), String> {
                     Err("Failed to open file".to_string())
                 }
             }
-            Err(e) => Err(format!("Failed to open file: {}", e))
+            Err(e) => Err(format!("Failed to open file: {}", e)),
         }
     }
-    
+
     #[cfg(target_os = "linux")]
     {
-        let result = Command::new("xdg-open")
-            .arg(&file_path)
-            .output();
-            
+        let result = Command::new("xdg-open").arg(&file_path).output();
+
         match result {
             Ok(output) => {
                 if output.status.success() {
@@ -1034,7 +1284,7 @@ async fn open_file(file_path: String) -> Result<(), String> {
                     Err("Failed to open file".to_string())
                 }
             }
-            Err(e) => Err(format!("Failed to open file: {}", e))
+            Err(e) => Err(format!("Failed to open file: {}", e)),
         }
     }
 }
@@ -1042,14 +1292,14 @@ async fn open_file(file_path: String) -> Result<(), String> {
 #[tauri::command]
 async fn create_directory(directory_path: String) -> Result<(), String> {
     let path = PathBuf::from(&directory_path);
-    
+
     if path.exists() {
         return Err("Directory already exists".to_string());
     }
-    
+
     match std::fs::create_dir_all(&path) {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to create directory: {}", e))
+        Err(e) => Err(format!("Failed to create directory: {}", e)),
     }
 }
 
@@ -1057,18 +1307,18 @@ async fn create_directory(directory_path: String) -> Result<(), String> {
 async fn rename_item(old_path: String, new_path: String) -> Result<(), String> {
     let old = PathBuf::from(&old_path);
     let new = PathBuf::from(&new_path);
-    
+
     if !old.exists() {
         return Err("Item does not exist".to_string());
     }
-    
+
     if new.exists() {
         return Err("Target path already exists".to_string());
     }
-    
+
     match std::fs::rename(&old, &new) {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to rename item: {}", e))
+        Err(e) => Err(format!("Failed to rename item: {}", e)),
     }
 }
 
@@ -1076,11 +1326,11 @@ async fn rename_item(old_path: String, new_path: String) -> Result<(), String> {
 async fn move_item(source_path: String, destination_path: String) -> Result<(), String> {
     let source = PathBuf::from(&source_path);
     let dest = PathBuf::from(&destination_path);
-    
+
     if !source.exists() {
         return Err("Source item does not exist".to_string());
     }
-    
+
     // Create destination directory if it doesn't exist
     if let Some(parent) = dest.parent() {
         if !parent.exists() {
@@ -1088,63 +1338,69 @@ async fn move_item(source_path: String, destination_path: String) -> Result<(), 
                 .map_err(|e| format!("Failed to create destination directory: {}", e))?;
         }
     }
-    
+
     match std::fs::rename(&source, &dest) {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to move item: {}", e))
+        Err(e) => Err(format!("Failed to move item: {}", e)),
     }
 }
 
 #[tauri::command]
 async fn delete_directory(directory_path: String) -> Result<(), String> {
     let path = PathBuf::from(&directory_path);
-    
+
     if !path.exists() {
         return Err("Directory does not exist".to_string());
     }
-    
+
     if !path.is_dir() {
         return Err("Path is not a directory".to_string());
     }
-    
+
     match std::fs::remove_dir_all(&path) {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to delete directory: {}", e))
+        Err(e) => Err(format!("Failed to delete directory: {}", e)),
     }
 }
 
-static VIDEO_SERVER_PORT: LazyLock<Arc<Mutex<Option<u16>>>> = LazyLock::new(|| Arc::new(Mutex::new(None)));
-static CURRENT_VIDEO_PATH: LazyLock<Arc<Mutex<Option<String>>>> = LazyLock::new(|| Arc::new(Mutex::new(None)));
+static VIDEO_SERVER_PORT: LazyLock<Arc<Mutex<Option<u16>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(None)));
+static VIDEO_PATHS: LazyLock<Arc<Mutex<HashMap<String, String>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 #[tauri::command]
 async fn start_video_server() -> Result<u16, String> {
     let mut port_guard = VIDEO_SERVER_PORT.lock().await;
-    
+
     // If server is already running, return the port
     if let Some(port) = *port_guard {
         return Ok(port);
     }
-    
+
     // Find an available port
     let port = find_available_port().await?;
-    
+
     // Start the server
     let server = warp::path!("video" / String)
         .and(warp::header::optional::<String>("range"))
         .and(warp::get())
         .and_then(serve_video_file);
-    
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_headers(vec!["range", "content-type"])
-        .allow_methods(&[warp::http::Method::GET, warp::http::Method::HEAD, warp::http::Method::OPTIONS]);
-        
+        .allow_methods(&[
+            warp::http::Method::GET,
+            warp::http::Method::HEAD,
+            warp::http::Method::OPTIONS,
+        ]);
+
     let server = warp::serve(server.with(cors));
-    
+
     tokio::spawn(async move {
         server.run(([127, 0, 0, 1], port)).await;
     });
-    
+
     *port_guard = Some(port);
     println!("Video server started on port {}", port);
     Ok(port)
@@ -1153,15 +1409,14 @@ async fn start_video_server() -> Result<u16, String> {
 #[tauri::command]
 async fn get_video_url(file_path: String) -> Result<String, String> {
     let path = PathBuf::from(&file_path);
-    
+
     if !path.exists() {
         return Err("File does not exist".to_string());
     }
-    
-    // Store the current video path
-    let mut current_path = CURRENT_VIDEO_PATH.lock().await;
-    *current_path = Some(file_path.clone());
-    
+
+    let video_id = Uuid::new_v4().to_string();
+    VIDEO_PATHS.lock().await.insert(video_id.clone(), file_path);
+
     // Get or start the server
     let port = {
         let port_guard = VIDEO_SERVER_PORT.lock().await;
@@ -1172,41 +1427,46 @@ async fn get_video_url(file_path: String) -> Result<String, String> {
             start_video_server().await?
         }
     };
-    
-    // Return the URL to access the video
-    let filename = path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("video.mp4");
-    
-    Ok(format!("http://127.0.0.1:{}/video/{}", port, urlencoding::encode(filename)))
+
+    Ok(format!("http://127.0.0.1:{}/video/{}", port, video_id))
 }
 
 async fn find_available_port() -> Result<u16, String> {
-    use std::net::{TcpListener, SocketAddr};
-    
+    use std::net::{SocketAddr, TcpListener};
+
     for port in 8080..9000 {
-        let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()
+        let addr: SocketAddr = format!("127.0.0.1:{}", port)
+            .parse()
             .map_err(|e| format!("Invalid address: {}", e))?;
-        
+
         if TcpListener::bind(addr).is_ok() {
             return Ok(port);
         }
     }
-    
+
     Err("No available ports found".to_string())
 }
 
-async fn serve_video_file(_filename: String, range_header: Option<String>) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    let current_path_guard = CURRENT_VIDEO_PATH.lock().await;
-    
-    if let Some(video_path) = current_path_guard.as_ref() {
+async fn serve_video_file(
+    video_id: String,
+    range_header: Option<String>,
+) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
+    let video_path = VIDEO_PATHS.lock().await.get(&video_id).cloned();
+
+    if let Some(video_path) = video_path {
         let path = PathBuf::from(video_path);
-        
         if path.exists() {
-            let file_size = tokio::fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0);
-            let mut file = tokio::fs::File::open(&path).await.map_err(|_| warp::reject::not_found())?;
-            
-            let mime_type = mime_guess::from_path(&path).first_or_octet_stream().to_string();
+            let file_size = tokio::fs::metadata(&path)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0);
+            let mut file = tokio::fs::File::open(&path)
+                .await
+                .map_err(|_| warp::reject::not_found())?;
+
+            let mime_type = mime_guess::from_path(&path)
+                .first_or_octet_stream()
+                .to_string();
 
             if let Some(range_str) = range_header {
                 if let Ok(ranges) = HttpRange::parse(&range_str, file_size) {
@@ -1216,14 +1476,21 @@ async fn serve_video_file(_filename: String, range_header: Option<String>) -> Re
                         let len = range.length;
                         let end = start + len - 1;
 
-                        file.seek(std::io::SeekFrom::Start(start)).await.map_err(|_| warp::reject::custom(ServerError))?;
-                        
+                        file.seek(std::io::SeekFrom::Start(start))
+                            .await
+                            .map_err(|_| warp::reject::custom(ServerError))?;
+
                         let mut buffer = vec![0; len as usize];
-                        file.read_exact(&mut buffer).await.map_err(|_| warp::reject::custom(ServerError))?;
+                        file.read_exact(&mut buffer)
+                            .await
+                            .map_err(|_| warp::reject::custom(ServerError))?;
 
                         let response = warp::http::Response::builder()
                             .status(StatusCode::PARTIAL_CONTENT)
-                            .header(header::CONTENT_RANGE, format!("bytes {}-{}/{}", start, end, file_size))
+                            .header(
+                                header::CONTENT_RANGE,
+                                format!("bytes {}-{}/{}", start, end, file_size),
+                            )
                             .header(header::CONTENT_LENGTH, len)
                             .header(header::ACCEPT_RANGES, "bytes")
                             .header(header::CONTENT_TYPE, mime_type.clone())
@@ -1237,7 +1504,7 @@ async fn serve_video_file(_filename: String, range_header: Option<String>) -> Re
             // No range header or invalid range, serve the whole file
             let stream = tokio_util::io::ReaderStream::new(file);
             let body = warp::hyper::Body::wrap_stream(stream);
-            
+
             let response = warp::http::Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_LENGTH, file_size)
@@ -1245,11 +1512,11 @@ async fn serve_video_file(_filename: String, range_header: Option<String>) -> Re
                 .header(header::ACCEPT_RANGES, "bytes")
                 .body(body)
                 .map_err(|_| warp::reject::custom(ServerError))?;
-            
+
             return Ok(Box::new(response));
         }
     }
-    
+
     Err(warp::reject::not_found())
 }
 
@@ -1275,9 +1542,15 @@ async fn check_dependencies(app: tauri::AppHandle) -> Result<serde_json::Value, 
             ytdlp_installed = true;
         }
     } else if ytdlp_path.exists() {
-        if let Ok(output) = create_hidden_command_with_path(&ytdlp_path).arg("--version").output() {
+        if let Ok(output) = create_hidden_command_with_path(&ytdlp_path)
+            .arg("--version")
+            .output()
+        {
             if output.status.success() {
-                ytdlp_version = format!("Managed: {}", String::from_utf8_lossy(&output.stdout).trim());
+                ytdlp_version = format!(
+                    "Managed: {}",
+                    String::from_utf8_lossy(&output.stdout).trim()
+                );
                 ytdlp_installed = true;
             }
         }
@@ -1288,17 +1561,30 @@ async fn check_dependencies(app: tauri::AppHandle) -> Result<serde_json::Value, 
         if output.status.success() {
             let output_str = String::from_utf8_lossy(&output.stdout);
             if let Some(line) = output_str.lines().next() {
-                let version = line.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Unknown").to_string();
+                let version = line
+                    .replace("ffmpeg version ", "")
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("Unknown")
+                    .to_string();
                 ffmpeg_version = format!("System: {}", version);
                 ffmpeg_installed = true;
             }
         }
     } else if ffmpeg_path.exists() {
-        if let Ok(output) = create_hidden_command_with_path(&ffmpeg_path).arg("-version").output() {
+        if let Ok(output) = create_hidden_command_with_path(&ffmpeg_path)
+            .arg("-version")
+            .output()
+        {
             if output.status.success() {
                 let output_str = String::from_utf8_lossy(&output.stdout);
                 if let Some(line) = output_str.lines().next() {
-                    let version = line.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Unknown").to_string();
+                    let version = line
+                        .replace("ffmpeg version ", "")
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or("Unknown")
+                        .to_string();
                     ffmpeg_version = format!("Managed: {}", version);
                     ffmpeg_installed = true;
                 }
@@ -1318,22 +1604,31 @@ async fn check_dependencies(app: tauri::AppHandle) -> Result<serde_json::Value, 
 async fn install_dependencies(app: tauri::AppHandle) -> Result<(), String> {
     let app_dir = get_app_dir(&app);
     if !app_dir.exists() {
-        fs::create_dir_all(&app_dir).map_err(|e| format!("Failed to create app directory: {}", e))?;
+        fs::create_dir_all(&app_dir)
+            .map_err(|e| format!("Failed to create app directory: {}", e))?;
     }
 
     // Check if yt-dlp is available system-wide first
-    let ytdlp_available = create_hidden_command("yt-dlp").arg("--version").output().is_ok();
+    let ytdlp_available = create_hidden_command("yt-dlp")
+        .arg("--version")
+        .output()
+        .is_ok();
     if !ytdlp_available {
         let ytdlp_path = get_yt_dlp_path(&app);
         if !ytdlp_path.exists() {
-            app.emit("dependency-install-progress", "Downloading yt-dlp...").map_err(|e| e.to_string())?;
-            
+            app.emit("dependency-install-progress", "Downloading yt-dlp...")
+                .map_err(|e| e.to_string())?;
+
             match get_latest_release_assets("yt-dlp/yt-dlp").await {
                 Ok(release) => {
                     if let Some(asset) = release.assets.iter().find(|a| a.name == "yt-dlp.exe") {
                         match download_file(&asset.browser_download_url, &ytdlp_path).await {
                             Ok(_) => {
-                                app.emit("dependency-install-progress", "yt-dlp downloaded successfully").map_err(|e| e.to_string())?;
+                                app.emit(
+                                    "dependency-install-progress",
+                                    "yt-dlp downloaded successfully",
+                                )
+                                .map_err(|e| e.to_string())?;
                             }
                             Err(e) => {
                                 return Err(format!("Failed to download yt-dlp: {}", e));
@@ -1348,103 +1643,169 @@ async fn install_dependencies(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
         } else {
-            app.emit("dependency-install-progress", "yt-dlp already installed (managed)").map_err(|e| e.to_string())?;
+            app.emit(
+                "dependency-install-progress",
+                "yt-dlp already installed (managed)",
+            )
+            .map_err(|e| e.to_string())?;
         }
     } else {
-        app.emit("dependency-install-progress", "yt-dlp already installed (system)").map_err(|e| e.to_string())?;
+        app.emit(
+            "dependency-install-progress",
+            "yt-dlp already installed (system)",
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     // Check if ffmpeg is available system-wide first
-    let ffmpeg_available = create_hidden_command("ffmpeg").arg("-version").output().is_ok();
+    let ffmpeg_available = create_hidden_command("ffmpeg")
+        .arg("-version")
+        .output()
+        .is_ok();
     if !ffmpeg_available {
         let ffmpeg_path = get_ffmpeg_path(&app);
         if !ffmpeg_path.exists() {
-            app.emit("dependency-install-progress", "Downloading ffmpeg...").map_err(|e| e.to_string())?;
-            
+            app.emit("dependency-install-progress", "Downloading ffmpeg...")
+                .map_err(|e| e.to_string())?;
+
             // Try to download from multiple sources
             let mut ffmpeg_installed = false;
-            
+
             // First try: GyanD/codexffmpeg
             match get_latest_release_assets("GyanD/codexffmpeg").await {
                 Ok(release) => {
-                    if let Some(asset) = release.assets.iter().find(|a| a.name.contains("essentials_build.zip")) {
+                    if let Some(asset) = release
+                        .assets
+                        .iter()
+                        .find(|a| a.name.contains("essentials_build.zip"))
+                    {
                         let zip_path = app_dir.join(&asset.name);
                         match download_file(&asset.browser_download_url, &zip_path).await {
                             Ok(_) => {
-                                app.emit("dependency-install-progress", "Extracting ffmpeg...").map_err(|e| e.to_string())?;
+                                app.emit("dependency-install-progress", "Extracting ffmpeg...")
+                                    .map_err(|e| e.to_string())?;
                                 match extract_zip(&zip_path, &app_dir) {
                                     Ok(_) => {
                                         let _ = fs::remove_file(zip_path);
                                         ffmpeg_installed = true;
-                                        app.emit("dependency-install-progress", "ffmpeg extracted successfully").map_err(|e| e.to_string())?;
+                                        app.emit(
+                                            "dependency-install-progress",
+                                            "ffmpeg extracted successfully",
+                                        )
+                                        .map_err(|e| e.to_string())?;
                                     }
                                     Err(e) => {
-                                        app.emit("dependency-install-progress", &format!("Failed to extract ffmpeg: {}", e)).map_err(|e| e.to_string())?;
+                                        app.emit(
+                                            "dependency-install-progress",
+                                            &format!("Failed to extract ffmpeg: {}", e),
+                                        )
+                                        .map_err(|e| e.to_string())?;
                                     }
                                 }
                             }
                             Err(e) => {
-                                app.emit("dependency-install-progress", &format!("Failed to download ffmpeg: {}", e)).map_err(|e| e.to_string())?;
+                                app.emit(
+                                    "dependency-install-progress",
+                                    &format!("Failed to download ffmpeg: {}", e),
+                                )
+                                .map_err(|e| e.to_string())?;
                             }
                         }
                     }
                 }
                 Err(e) => {
-                    app.emit("dependency-install-progress", &format!("Failed to get ffmpeg release info: {}", e)).map_err(|e| e.to_string())?;
+                    app.emit(
+                        "dependency-install-progress",
+                        &format!("Failed to get ffmpeg release info: {}", e),
+                    )
+                    .map_err(|e| e.to_string())?;
                 }
             }
-            
+
             // Second try: Direct download from a static URL if the above fails
             if !ffmpeg_installed {
-                app.emit("dependency-install-progress", "Downloading ffmpeg from alternative source...").map_err(|e| e.to_string())?;
+                app.emit(
+                    "dependency-install-progress",
+                    "Downloading ffmpeg from alternative source...",
+                )
+                .map_err(|e| e.to_string())?;
                 let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
                 let zip_path = app_dir.join("ffmpeg-essentials.zip");
-                
+
                 match download_file(ffmpeg_url, &zip_path).await {
                     Ok(_) => {
-                        app.emit("dependency-install-progress", "Extracting ffmpeg...").map_err(|e| e.to_string())?;
+                        app.emit("dependency-install-progress", "Extracting ffmpeg...")
+                            .map_err(|e| e.to_string())?;
                         match extract_zip(&zip_path, &app_dir) {
                             Ok(_) => {
                                 let _ = fs::remove_file(zip_path);
                                 ffmpeg_installed = true;
-                                app.emit("dependency-install-progress", "ffmpeg extracted successfully").map_err(|e| e.to_string())?;
+                                app.emit(
+                                    "dependency-install-progress",
+                                    "ffmpeg extracted successfully",
+                                )
+                                .map_err(|e| e.to_string())?;
                             }
                             Err(e) => {
-                                app.emit("dependency-install-progress", &format!("Failed to extract ffmpeg: {}", e)).map_err(|e| e.to_string())?;
+                                app.emit(
+                                    "dependency-install-progress",
+                                    &format!("Failed to extract ffmpeg: {}", e),
+                                )
+                                .map_err(|e| e.to_string())?;
                             }
                         }
                     }
                     Err(e) => {
-                        app.emit("dependency-install-progress", &format!("Failed to download ffmpeg from alternative source: {}", e)).map_err(|e| e.to_string())?;
+                        app.emit(
+                            "dependency-install-progress",
+                            &format!("Failed to download ffmpeg from alternative source: {}", e),
+                        )
+                        .map_err(|e| e.to_string())?;
                     }
                 }
             }
-            
+
             if !ffmpeg_installed {
                 return Err("Failed to install ffmpeg from all available sources".to_string());
             }
         } else {
-            app.emit("dependency-install-progress", "ffmpeg already installed (managed)").map_err(|e| e.to_string())?;
+            app.emit(
+                "dependency-install-progress",
+                "ffmpeg already installed (managed)",
+            )
+            .map_err(|e| e.to_string())?;
         }
     } else {
-        app.emit("dependency-install-progress", "ffmpeg already installed (system)").map_err(|e| e.to_string())?;
+        app.emit(
+            "dependency-install-progress",
+            "ffmpeg already installed (system)",
+        )
+        .map_err(|e| e.to_string())?;
     }
-    
-    app.emit("dependency-install-progress", "All dependencies are available.").map_err(|e| e.to_string())?;
+
+    app.emit(
+        "dependency-install-progress",
+        "All dependencies are available.",
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
-async fn generate_thumbnail_data(app: tauri::AppHandle, file_path: String) -> Result<String, String> {
+async fn generate_thumbnail_data(
+    app: tauri::AppHandle,
+    file_path: String,
+) -> Result<String, String> {
     let input_path = std::path::PathBuf::from(&file_path);
-    
+
     if !input_path.exists() {
         return Err("Input file does not exist".to_string());
     }
 
     // Get file extension to determine how to handle it
-    let extension = input_path.extension()
+    let extension = input_path
+        .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or("")
         .to_lowercase();
@@ -1469,7 +1830,11 @@ async fn generate_thumbnail_data(app: tauri::AppHandle, file_path: String) -> Re
     }
 
     // For videos, use FFmpeg to extract thumbnail to stdout and encode as base64
-    if ["mp4", "avi", "mov", "mkv", "webm", "flv", "wmv", "m4v", "3gp"].contains(&extension.as_str()) {
+    if [
+        "mp4", "avi", "mov", "mkv", "webm", "flv", "wmv", "m4v", "3gp",
+    ]
+    .contains(&extension.as_str())
+    {
         let ffmpeg_cmd = get_ffmpeg_command();
         let mut cmd = if ffmpeg_cmd == "managed" {
             let ffmpeg_path = get_ffmpeg_path(&app);
@@ -1477,7 +1842,7 @@ async fn generate_thumbnail_data(app: tauri::AppHandle, file_path: String) -> Re
         } else {
             create_hidden_command("ffmpeg")
         };
-        
+
         cmd.arg("-i")
             .arg(&file_path)
             .arg("-ss")
@@ -1494,7 +1859,8 @@ async fn generate_thumbnail_data(app: tauri::AppHandle, file_path: String) -> Re
             .arg("mjpeg") // JPEG format
             .arg("-");
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .map_err(|e| format!("Failed to execute FFmpeg: {}", e))?;
 
         if !output.status.success() {
@@ -1516,15 +1882,15 @@ async fn generate_thumbnail_data(app: tauri::AppHandle, file_path: String) -> Re
 #[tauri::command]
 async fn show_in_explorer(file_path: String) -> Result<(), String> {
     let path = std::path::PathBuf::from(&file_path);
-    
+
     if !path.exists() {
         return Err("File does not exist".to_string());
     }
 
     #[cfg(target_os = "windows")]
     {
-        Command::new("explorer")
-            .arg("/select,")
+        let mut cmd = create_hidden_command("explorer");
+        cmd.arg("/select,")
             .arg(file_path.replace('/', "\\"))
             .spawn()
             .map_err(|e| format!("Failed to show file in explorer: {}", e))?;
@@ -1543,7 +1909,7 @@ async fn show_in_explorer(file_path: String) -> Result<(), String> {
         // Try different file managers
         let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm", "caja"];
         let parent = path.parent().ok_or("Could not get parent directory")?;
-        
+
         for manager in &file_managers {
             if std::process::Command::new("which")
                 .arg(manager)
@@ -1558,7 +1924,7 @@ async fn show_in_explorer(file_path: String) -> Result<(), String> {
                 return Ok(());
             }
         }
-        
+
         return Err("No supported file manager found".to_string());
     }
 
@@ -1568,7 +1934,7 @@ async fn show_in_explorer(file_path: String) -> Result<(), String> {
 #[tauri::command]
 async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
     let path = std::path::PathBuf::from(&file_path);
-    
+
     if !path.exists() {
         return Err("File does not exist".to_string());
     }
@@ -1577,14 +1943,25 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
     {
         // Use PowerShell to copy file to clipboard on Windows
         let powershell_script = format!(
-            "Set-Clipboard -Path '{}'", 
+            "Set-Clipboard -Path '{}'",
             path.to_string_lossy().replace("'", "''")
         );
-        
-        let result = Command::new("powershell")
-            .args(["-Command", &powershell_script])
-            .output();
-        
+
+        // Hide the PowerShell window using creation flags and minimal startup switches
+        let result = {
+            let mut cmd = create_hidden_command("powershell");
+            cmd.args([
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &powershell_script,
+            ]);
+            cmd.output()
+        };
+
         match result {
             Ok(output) => {
                 if output.status.success() {
@@ -1594,10 +1971,10 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
                     Err(format!("Failed to copy file to clipboard: {}", error))
                 }
             }
-            Err(e) => Err(format!("Failed to execute PowerShell command: {}", e))
+            Err(e) => Err(format!("Failed to execute PowerShell command: {}", e)),
         }
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         // Use osascript to copy file to clipboard on macOS
@@ -1605,11 +1982,11 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
             "tell application \"Finder\" to set the clipboard to (POSIX file \"{}\")",
             path.to_string_lossy()
         );
-        
+
         let result = Command::new("osascript")
             .args(["-e", &applescript])
             .output();
-            
+
         match result {
             Ok(output) => {
                 if output.status.success() {
@@ -1619,16 +1996,16 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
                     Err(format!("Failed to copy file to clipboard: {}", error))
                 }
             }
-            Err(e) => Err(format!("Failed to execute AppleScript: {}", e))
+            Err(e) => Err(format!("Failed to execute AppleScript: {}", e)),
         }
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         // Use xclip to copy file path to clipboard on Linux
         // First try to copy as file URI
         let file_uri = format!("file://{}", path.to_string_lossy());
-        
+
         let result = Command::new("xclip")
             .args(["-selection", "clipboard", "-t", "text/uri-list"])
             .arg("-i")
@@ -1641,7 +2018,7 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
                 }
                 child.wait()
             });
-            
+
         match result {
             Ok(status) => {
                 if status.success() {
@@ -1664,7 +2041,7 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
                         }
                         child.wait()
                     });
-                
+
                 match result {
                     Ok(status) => {
                         if status.success() {
@@ -1673,7 +2050,7 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
                             Err("Failed to copy file path to clipboard".to_string())
                         }
                     }
-                    Err(e) => Err(format!("xclip not available: {}", e))
+                    Err(e) => Err(format!("xclip not available: {}", e)),
                 }
             }
         }
@@ -1682,7 +2059,11 @@ async fn copy_file_to_clipboard(file_path: String) -> Result<(), String> {
 
 fn get_yt_dlp_command() -> String {
     // Try system-wide yt-dlp first
-    if create_hidden_command("yt-dlp").arg("--version").output().is_ok() {
+    if create_hidden_command("yt-dlp")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
         "yt-dlp".to_string()
     } else {
         // Fallback to managed version (will be handled by get_yt_dlp_path)
@@ -1692,7 +2073,11 @@ fn get_yt_dlp_command() -> String {
 
 fn get_ffmpeg_command() -> String {
     // Try system-wide ffmpeg first
-    if create_hidden_command("ffmpeg").arg("-version").output().is_ok() {
+    if create_hidden_command("ffmpeg")
+        .arg("-version")
+        .output()
+        .is_ok()
+    {
         "ffmpeg".to_string()
     } else {
         // Fallback to managed version (will be handled by get_ffmpeg_path)
@@ -1702,7 +2087,11 @@ fn get_ffmpeg_command() -> String {
 
 fn get_ffprobe_command() -> String {
     // Try system-wide ffprobe first
-    if create_hidden_command("ffprobe").arg("-version").output().is_ok() {
+    if create_hidden_command("ffprobe")
+        .arg("-version")
+        .output()
+        .is_ok()
+    {
         "ffprobe".to_string()
     } else {
         // Fallback to managed version (will be handled by get_ffprobe_path)
@@ -1722,7 +2111,7 @@ fn get_yt_dlp_path(app: &tauri::AppHandle) -> PathBuf {
 
 fn get_ffmpeg_path(app: &tauri::AppHandle) -> PathBuf {
     let app_dir = get_app_dir(app);
-    
+
     // Try to find ffmpeg in any extracted directory
     if let Ok(entries) = fs::read_dir(&app_dir) {
         for entry in entries.flatten() {
@@ -1737,14 +2126,14 @@ fn get_ffmpeg_path(app: &tauri::AppHandle) -> PathBuf {
             }
         }
     }
-    
+
     // Fallback to default path
     app_dir.join("ffmpeg").join("bin").join("ffmpeg.exe")
 }
 
 fn get_ffprobe_path(app: &tauri::AppHandle) -> PathBuf {
     let app_dir = get_app_dir(app);
-    
+
     // Try to find ffprobe in any extracted directory
     if let Ok(entries) = fs::read_dir(&app_dir) {
         for entry in entries.flatten() {
@@ -1759,7 +2148,7 @@ fn get_ffprobe_path(app: &tauri::AppHandle) -> PathBuf {
             }
         }
     }
-    
+
     // Fallback to default path
     app_dir.join("ffmpeg").join("bin").join("ffprobe.exe")
 }
@@ -1767,7 +2156,7 @@ fn get_ffprobe_path(app: &tauri::AppHandle) -> PathBuf {
 async fn get_latest_release_assets(repo: &str) -> Result<GithubRelease, String> {
     let client = Client::new();
     let url = format!("{}{}/releases/latest", GITHUB_API_URL, repo);
-    
+
     client
         .get(&url)
         .header("User-Agent", "tauri-app")
@@ -1849,45 +2238,55 @@ pub fn run() {
 async fn get_installation_logs(app: tauri::AppHandle) -> Result<String, String> {
     let app_dir = get_app_dir(&app);
     let mut logs = Vec::new();
-    
+
     logs.push(format!("App directory: {}", app_dir.display()));
-    
+
     // Check yt-dlp
     let ytdlp_path = get_yt_dlp_path(&app);
     logs.push(format!("yt-dlp path: {}", ytdlp_path.display()));
     logs.push(format!("yt-dlp exists: {}", ytdlp_path.exists()));
-    
+
     // Check ffmpeg
     let ffmpeg_path = get_ffmpeg_path(&app);
     logs.push(format!("ffmpeg path: {}", ffmpeg_path.display()));
     logs.push(format!("ffmpeg exists: {}", ffmpeg_path.exists()));
-    
+
     // Check ffprobe
     let ffprobe_path = get_ffprobe_path(&app);
     logs.push(format!("ffprobe path: {}", ffprobe_path.display()));
     logs.push(format!("ffprobe exists: {}", ffprobe_path.exists()));
-    
+
     // List app directory contents
     logs.push("App directory contents:".to_string());
     if let Ok(entries) = fs::read_dir(&app_dir) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
-            logs.push(format!("  {} {}", if is_dir { "[DIR]" } else { "[FILE]" }, name));
-            
+            logs.push(format!(
+                "  {} {}",
+                if is_dir { "[DIR]" } else { "[FILE]" },
+                name
+            ));
+
             // If it's a directory that looks like ffmpeg, list its contents
             if is_dir && name.contains("ffmpeg") {
                 if let Ok(sub_entries) = fs::read_dir(entry.path()) {
                     for sub_entry in sub_entries.flatten() {
                         let sub_name = sub_entry.file_name().to_string_lossy().to_string();
-                        let sub_is_dir = sub_entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
-                        logs.push(format!("    {} {}", if sub_is_dir { "[DIR]" } else { "[FILE]" }, sub_name));
-                        
+                        let sub_is_dir =
+                            sub_entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+                        logs.push(format!(
+                            "    {} {}",
+                            if sub_is_dir { "[DIR]" } else { "[FILE]" },
+                            sub_name
+                        ));
+
                         // Check bin directory
                         if sub_is_dir && sub_name == "bin" {
                             if let Ok(bin_entries) = fs::read_dir(sub_entry.path()) {
                                 for bin_entry in bin_entries.flatten() {
-                                    let bin_name = bin_entry.file_name().to_string_lossy().to_string();
+                                    let bin_name =
+                                        bin_entry.file_name().to_string_lossy().to_string();
                                     logs.push(format!("      [FILE] {}", bin_name));
                                 }
                             }
@@ -1897,6 +2296,6 @@ async fn get_installation_logs(app: tauri::AppHandle) -> Result<String, String> 
             }
         }
     }
-    
+
     Ok(logs.join("\n"))
 }
