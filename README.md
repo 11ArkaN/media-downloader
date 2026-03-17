@@ -48,19 +48,12 @@ npm run tauri build
 
 Build artifacts are written under `src-tauri/target/`.
 
-## Repository Hygiene
-
-- Generated downloads, converted media, local databases, temp folders, and build output are gitignored.
-- A tracked generated video artifact was removed as part of release cleanup.
-- No repository secrets were found in tracked text files during the release scan.
-
-## Privacy Notes
+## Privacy
 
 - App settings are currently stored locally in browser storage.
 - Downloaded and converted media stay on the local machine unless the user moves or shares them.
 - Respect the terms of service and copyright rules for any source you download from.
 
-## Release Notes
+## License
 
-- Replace placeholder repository links with the real public repository URL after publishing.
-- Add an explicit license file before release if you want to grant reuse rights.
+MIT — see [LICENSE](LICENSE).

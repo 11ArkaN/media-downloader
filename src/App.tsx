@@ -20,12 +20,10 @@ const getInitialOverlayState = () => {
     const timeSinceLastCheck = Date.now() - parseInt(lastCheckTime, 10)
     const twentyFourHours = 24 * 60 * 60 * 1000
     if (timeSinceLastCheck < twentyFourHours) {
-      console.log('Cached data is valid, not showing overlay.')
       return false // Don't show overlay
     }
   }
 
-  console.log('Cached data invalid or missing, showing overlay.')
   return true // Show overlay
 }
 

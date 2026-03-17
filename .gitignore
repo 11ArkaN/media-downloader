@@ -55,3 +55,6 @@ temp/
 # Database files
 *.db
 *.sqlite
+
+# Internal tooling
+.kiro/

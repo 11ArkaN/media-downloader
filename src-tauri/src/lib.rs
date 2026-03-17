@@ -136,12 +136,6 @@ impl Default for AppSettings {
     }
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[tauri::command]
 async fn start_download(app: tauri::AppHandle, request: DownloadRequest) -> Result<String, String> {
     let download_id = Uuid::new_v4().to_string();
@@ -408,7 +402,6 @@ async fn execute_video_processing(
 
     // Check if the input video has audio streams using ffprobe
     let has_audio = check_video_has_audio(&app, &request.input_path).await.unwrap_or(false);
-    println!("Input video has audio: {}", has_audio);
 
     // Collect all trim operations to handle multiple segments
     let mut trim_operations: Vec<(f64, f64)> = Vec::new();
@@ -798,9 +791,6 @@ async fn execute_video_processing(
         .arg("-y")
         .arg(&request.output_path);
 
-    // Debug: Print the full command
-    println!("FFmpeg command: {:?}", cmd);
-
     // Emit processing progress
     let _ = app.emit(
         "processing-progress",
@@ -819,10 +809,6 @@ async fn execute_video_processing(
             // Check if this is just a fontconfig warning (not a real error)
             let is_fontconfig_warning =
                 stderr_output.contains("Fontconfig error") && output.status.success();
-
-            // Log the command output for debugging
-            println!("FFmpeg stderr: {}", stderr_output);
-            println!("FFmpeg exit status: {}", output.status);
 
             let _ = app.emit(
                 "processing-progress",
@@ -1013,8 +999,6 @@ async fn fetch_video_info(
                     // Debug output for resolution detection issues
                     if max_height == 0 {
                         eprintln!("Warning: No video height detected from formats");
-                    } else {
-                        println!("Detected max resolution: {}p", max_height);
                     }
 
                     // Additional fallback audio detection methods
@@ -1402,7 +1386,6 @@ async fn start_video_server() -> Result<u16, String> {
     });
 
     *port_guard = Some(port);
-    println!("Video server started on port {}", port);
     Ok(port)
 }
 
@@ -2207,7 +2190,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             start_download,
             get_video_info,
             fetch_video_info,

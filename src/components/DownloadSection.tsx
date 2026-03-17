@@ -93,20 +93,14 @@ const DownloadSection: React.FC = () => {
 
   const selectOutputPath = async () => {
     try {
-      console.log('Opening folder dialog...')
       const selected = await open({
         directory: true,
         multiple: false,
         title: t('download_section.select_folder_title')
       })
 
-      console.log('Dialog result:', selected)
-
       if (selected && typeof selected === 'string') {
         setOutputPath(selected)
-        console.log('Output path set to:', selected)
-      } else if (selected === null) {
-        console.log('User cancelled dialog')
       }
     } catch (error) {
       console.error('Error selecting path:', error)
@@ -171,7 +165,6 @@ const DownloadSection: React.FC = () => {
             actualQuality = `${bestAvailableHeight}p`;
           }
 
-          console.log(`Fallback: ${selectedQuality} -> ${actualQuality}, format: ${formatString}`)
         }
       }
 
