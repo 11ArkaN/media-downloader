@@ -14,7 +14,7 @@ interface Platform {
 }
 
 const platforms: Platform[] = [
-  { name: 'Windows', icon: FaWindows, version: '10+', format: '.msi', size: '~85 MB', url: '#', comingSoon: false },
+  { name: 'Windows', icon: FaWindows, version: '10+', format: '.msi', size: '~5.8 MB', url: 'https://github.com/11ArkaN/media-downloader/releases/download/v0.1.0/Media.Downloader_0.1.0_x64_en-US.msi', comingSoon: false },
   { name: 'macOS', icon: FaApple, version: '10.15+', format: '.dmg', size: '~92 MB', url: '#', comingSoon: true },
   { name: 'Linux', icon: FaLinux, version: 'Ubuntu 20.04+', format: '.deb', size: '~88 MB', url: '#', comingSoon: true },
 ];
