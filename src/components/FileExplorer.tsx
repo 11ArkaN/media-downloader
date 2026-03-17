@@ -120,7 +120,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ isOpen, onClose, vi
             <h3 className="text-xl font-bold text-white truncate mr-4">{fileName}</h3>
             <button
               onClick={onClose}
-              className="glass-button px-3 py-2 rounded-lg flex items-center space-x-2 hover:scale-105 transition-transform"
+              className="glass-button px-3 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-150"
             >
               <span>✕</span>
               <span>{t('file_explorer.video_player_close_button')}</span>
@@ -336,13 +336,13 @@ const DeleteConfirmationModal: React.FC<{
           <div className="flex items-center justify-end space-x-3">
             <button
               onClick={onCancel}
-              className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+              className="glass-button px-4 py-2 rounded-lg transition-colors duration-150"
             >
               {t('file_explorer.cancel')}
             </button>
             <button
               onClick={onConfirm}
-              className="glass-button bg-red-500/20 hover:bg-red-500/40 border-red-500/30 hover:border-red-500/50 text-red-300 hover:text-red-200 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105"
+              className="glass-button bg-red-500/20 hover:bg-red-500/40 border-red-500/30 hover:border-red-500/50 text-red-300 hover:text-red-200 px-4 py-2 rounded-lg font-medium transition-colors duration-150"
             >
               {isSingleFile
                 ? t('file_explorer.delete_file')
@@ -581,7 +581,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       case 'directory':
         return <Folder className={`${iconSize} text-yellow-400`} />
       case 'video':
-        return <FileVideo className={`${iconSize} text-purple-400`} />
+        return <FileVideo className={`${iconSize} text-blue-400`} />
       case 'audio':
         return <Music className={`${iconSize} text-green-400`} />
       case 'image':
@@ -594,7 +594,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'directory': return 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30'
-      case 'video': return 'bg-purple-600/20 text-purple-300 border-purple-500/30'
+      case 'video': return 'bg-blue-600/20 text-blue-200 border-blue-500/30'
       case 'audio': return 'bg-green-600/20 text-green-300 border-green-500/30'
       case 'image': return 'bg-blue-600/20 text-blue-300 border-blue-500/30'
       default: return 'bg-gray-600/20 text-gray-300 border-gray-500/30'
@@ -797,12 +797,12 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
-        className="glass-effect rounded-xl p-4 mb-6 border border-lilac-500/30"
+        className="glass-effect rounded-xl p-4 mb-6 border border-white/[0.12]"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-lilac-500 rounded-full flex items-center justify-center">
+              <div className="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center">
                 <Check className="w-4 h-4 text-white" />
               </div>
               <span className="text-white font-semibold">
@@ -813,13 +813,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             <div className="flex items-center space-x-2">
               <button
                 onClick={selectAllFiles}
-                className="glass-button text-sm px-3 py-1 rounded-lg hover:scale-105 transition-transform"
+                className="glass-button text-sm px-3 py-1 rounded-lg transition-colors duration-150"
               >
                 {t('file_explorer.select_all')}
               </button>
               <button
                 onClick={clearSelection}
-                className="glass-button text-sm px-3 py-1 rounded-lg hover:scale-105 transition-transform"
+                className="glass-button text-sm px-3 py-1 rounded-lg transition-colors duration-150"
               >
                 {t('file_explorer.clear_selection')}
               </button>
@@ -830,7 +830,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             {selectedVideoCount > 0 && (
               <button
                 onClick={playSelectedVideos}
-                className="glass-button text-sm px-3 py-1 rounded-lg flex items-center space-x-2 text-purple-400 hover:text-purple-300 hover:scale-105 transition-all"
+                className="glass-button text-sm px-3 py-1 rounded-lg flex items-center space-x-2 text-blue-300 hover:text-blue-200 transition-colors duration-150"
               >
                 <Play className="w-4 h-4" />
                 <span>{t('file_explorer.play_selected_videos', { count: selectedVideoCount })}</span>
@@ -838,14 +838,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             )}
             <button
               onClick={showSelectedInExplorer}
-              className="glass-button text-sm px-3 py-1 rounded-lg flex items-center space-x-2 hover:scale-105 transition-transform"
+              className="glass-button text-sm px-3 py-1 rounded-lg flex items-center space-x-2 transition-colors duration-150"
             >
               <ExternalLink className="w-4 h-4" />
               <span>{t('file_explorer.show_in_folder')}</span>
             </button>
             <button
               onClick={deleteSelectedFiles}
-              className="glass-button text-sm px-3 py-1 rounded-lg flex items-center space-x-2 text-red-400 hover:text-red-300 hover:scale-105 transition-all border-red-500/30 hover:border-red-400/50"
+              className="glass-button text-sm px-3 py-1 rounded-lg flex items-center space-x-2 text-red-400 hover:text-red-300 transition-colors duration-150 border-red-500/30 hover:border-red-400/50"
             >
               <Trash2 className="w-4 h-4" />
               <span>{t('file_explorer.delete_selected')}</span>
@@ -862,11 +862,11 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       className={
         viewMode === 'grid'
           ? `relative group glass-card rounded-2xl p-4 flex flex-col justify-between cursor-pointer
-             border-2 ${selectedFiles.includes(file.id) ? 'border-lilac-500 shadow-lg shadow-lilac-500/25' : 'border-transparent'}
-             hover:scale-[1.02] transition-all duration-200`
+             border-2 ${selectedFiles.includes(file.id) ? 'border-blue-500' : 'border-transparent'}
+             transition-colors duration-150`
           : `relative group glass-card rounded-xl p-3 flex items-center space-x-4 cursor-pointer
-             border-2 ${selectedFiles.includes(file.id) ? 'border-lilac-500 shadow-lg shadow-lilac-500/25' : 'border-transparent'}
-             hover:scale-[1.01] transition-all duration-200`
+             border-2 ${selectedFiles.includes(file.id) ? 'border-blue-500' : 'border-transparent'}
+             transition-colors duration-150`
       }
       onClick={() => toggleFileSelection(file.id)}
       onDoubleClick={() => {
@@ -883,7 +883,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
-            className="absolute top-2 right-2 w-5 h-5 bg-lilac-500 rounded-full flex items-center justify-center border-2 border-gray-800 z-20"
+            className="absolute top-2 right-2 w-5 h-5 bg-blue-400 rounded-full flex items-center justify-center border-2 border-gray-800 z-20"
           >
             <Check className="w-3 h-3 text-white" />
           </motion.div>
@@ -922,7 +922,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           <div className={`px-2 py-1 rounded-full text-xs font-semibold ${getTypeColor(file.type)}`}>
             {file.type === 'directory' ? 'folder' : file.type}
           </div>
-          <button onClick={(e) => handleContextMenu(e, file)} className="glass-button p-2 rounded-full hover:scale-110 transition-transform">
+          <button onClick={(e) => handleContextMenu(e, file)} className="glass-button p-2 rounded-full transition-colors duration-150">
             <MoreVertical className="w-4 h-4 text-gray-400" />
           </button>
         </>
@@ -931,24 +931,24 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center z-10">
         <div className="flex space-x-2">
           {file.type === 'directory' ? (
-            <button onClick={(e) => { e.stopPropagation(); navigateToDirectory(file.path); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-yellow-500/30" title={t('file_explorer.file_actions.open_folder')}>
+            <button onClick={(e) => { e.stopPropagation(); navigateToDirectory(file.path); }} className="glass-button p-3 rounded-full transition-colors duration-150 border-yellow-500/30" title={t('file_explorer.file_actions.open_folder')}>
               <FolderOpen className="w-5 h-5 text-yellow-300" />
             </button>
           ) : file.type === 'video' ? (
-            <button onClick={(e) => { e.stopPropagation(); playVideoInApp(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-purple-500/30" title={t('file_explorer.file_actions.play_in_app')}>
-              <Play className="w-5 h-5 text-purple-300" />
+            <button onClick={(e) => { e.stopPropagation(); playVideoInApp(file); }} className="glass-button p-3 rounded-full transition-colors duration-150 border-blue-500/30" title={t('file_explorer.file_actions.play_in_app')}>
+              <Play className="w-5 h-5 text-blue-200" />
             </button>
           ) : (
-            <button onClick={(e) => { e.stopPropagation(); previewFile(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform" title={t('file_explorer.file_actions.preview')}>
+            <button onClick={(e) => { e.stopPropagation(); previewFile(file); }} className="glass-button p-3 rounded-full transition-colors duration-150" title={t('file_explorer.file_actions.preview')}>
               <Eye className="w-5 h-5 text-white" />
             </button>
           )}
           {file.type === 'video' && onSelectVideo && (
-            <button onClick={(e) => { e.stopPropagation(); editFile(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform" title={t('file_explorer.file_actions.edit')}>
+            <button onClick={(e) => { e.stopPropagation(); editFile(file); }} className="glass-button p-3 rounded-full transition-colors duration-150" title={t('file_explorer.file_actions.edit')}>
               <Edit className="w-5 h-5 text-white" />
             </button>
           )}
-          <button onClick={(e) => { e.stopPropagation(); deleteFile(file); }} className="glass-button p-3 rounded-full hover:scale-110 transition-transform border-red-500/30" title={file.type === 'directory' ? t('file_explorer.file_actions.delete_folder') : t('file_explorer.file_actions.delete')}>
+          <button onClick={(e) => { e.stopPropagation(); deleteFile(file); }} className="glass-button p-3 rounded-full transition-colors duration-150 border-red-500/30" title={file.type === 'directory' ? t('file_explorer.file_actions.delete_folder') : t('file_explorer.file_actions.delete')}>
             <Trash2 className="w-5 h-5 text-red-300" />
           </button>
         </div>
@@ -972,10 +972,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
       </div>
       <div className="flex items-center space-x-2">
         <div className="flex items-center glass-effect-subtle rounded-lg p-1">
-          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-lilac-500 text-white shadow-lg' : 'text-gray-400 hover:bg-white/10'}`} title={t('file_explorer.view_mode_grid')}>
+          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-blue-400 text-white shadow-lg' : 'text-gray-400 hover:bg-white/10'}`} title={t('file_explorer.view_mode_grid')}>
             <Grid className="w-5 h-5" />
           </button>
-          <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-lilac-500 text-white shadow-lg' : 'text-gray-400 hover:bg-white/10'}`} title={t('file_explorer.view_mode_list')}>
+          <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-blue-400 text-white shadow-lg' : 'text-gray-400 hover:bg-white/10'}`} title={t('file_explorer.view_mode_list')}>
             <List className="w-5 h-5" />
           </button>
         </div>
@@ -1071,7 +1071,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
               </button>
             ) : showContextMenu.file.type === 'video' ? (
               <button onClick={() => { playVideoInApp(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
-                <div className="flex items-center space-x-2 text-purple-400">
+                <div className="flex items-center space-x-2 text-blue-400">
                   <Play className="w-4 h-4" />
                   <span>{t('file_explorer.file_actions.play_in_app')}</span>
                 </div>
@@ -1107,7 +1107,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
             <div className="h-[1px] bg-gray-700 my-1"></div>
             {showContextMenu.file.type === 'video' && onSelectVideo && (
               <button onClick={() => { editFile(showContextMenu.file); setShowContextMenu(null); }} className="context-menu-item">
-                <div className="flex items-center space-x-2 text-purple-400">
+                <div className="flex items-center space-x-2 text-blue-400">
                   <Edit className="w-4 h-4" />
                   <span>{t('file_explorer.file_actions.edit')}</span>
                 </div>
@@ -1132,7 +1132,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
     <div className="glass-effect rounded-2xl p-8">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
             <Folder className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -1144,17 +1144,17 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ onSelectVideo }) => {
           <button
             onClick={navigateBack}
             disabled={directoryHistory.length <= 1}
-            className={`glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform ${directoryHistory.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`glass-button px-4 py-2 rounded-lg transition-colors duration-150 ${directoryHistory.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {t('file_explorer.back_button')}
           </button>
-          <button onClick={createNewFolder} className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform">
+          <button onClick={createNewFolder} className="glass-button px-4 py-2 rounded-lg transition-colors duration-150">
             {t('file_explorer.create_folder_button')}
           </button>
-          <button onClick={selectDirectory} className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform">
+          <button onClick={selectDirectory} className="glass-button px-4 py-2 rounded-lg transition-colors duration-150">
             {t('file_explorer.change_directory_button')}
           </button>
-          <button onClick={refreshFiles} className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-transform">
+          <button onClick={refreshFiles} className="glass-button px-4 py-2 rounded-lg transition-colors duration-150">
             {t('file_explorer.refresh_button')}
           </button>
         </div>

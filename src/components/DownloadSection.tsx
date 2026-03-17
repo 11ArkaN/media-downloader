@@ -511,7 +511,7 @@ const DownloadSection: React.FC = () => {
           className="glass-effect rounded-2xl p-8"
         >
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-r from-lilac-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
               <Download className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-2xl font-bold text-white">{t('download_section.title')}</h2>
@@ -545,7 +545,7 @@ const DownloadSection: React.FC = () => {
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                       <Info className="w-4 h-4 text-white" />
                     </div>
                     <h3 className="text-lg font-semibold text-white">{t('download_section.video_info.title')}</h3>
@@ -615,7 +615,7 @@ const DownloadSection: React.FC = () => {
                           whileHover={{ scale: 1.02 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Monitor className="w-4 h-4 text-purple-400" />
+                          <Monitor className="w-4 h-4 text-blue-400" />
                           <div>
                             <div className="text-xs text-gray-400">{t('download_section.video_info.max_resolution')}</div>
                             <div className="font-medium">{videoInfo.maxResolution}</div>
@@ -659,14 +659,12 @@ const DownloadSection: React.FC = () => {
                                 key={index}
                                 onClick={() => isClickable && handleResolutionClick(resolution)}
                                 disabled={!isClickable}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${isCurrentlySelected
-                                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-400/50 shadow-lg shadow-purple-500/25'
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-150 ${isCurrentlySelected
+                                  ? 'bg-blue-500 text-white border-blue-400/50'
                                   : isClickable
-                                    ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-gray-300 border-gray-600/50 hover:border-gray-500/50 hover:from-gray-600 hover:to-gray-500 cursor-pointer'
-                                    : 'bg-gradient-to-r from-gray-800 to-gray-700 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60'
+                                    ? 'bg-white/[0.06] text-gray-300 border-white/[0.1] hover:border-white/[0.2] hover:bg-white/[0.1] cursor-pointer'
+                                    : 'bg-white/[0.03] text-gray-500 border-white/[0.06] cursor-not-allowed opacity-60'
                                   }`}
-                                whileHover={isClickable ? { scale: 1.05 } : {}}
-                                whileTap={isClickable ? { scale: 0.95 } : {}}
                                 transition={{ duration: 0.1 }}
                                 title={isClickable ? t('download_section.ui.click_to_select_quality', { quality: qualityValue }) : t('download_section.ui.resolution_cannot_be_mapped')}
                               >
@@ -872,8 +870,8 @@ const DownloadSection: React.FC = () => {
                         checked={audioSettings.includeAudio}
                         disabled={!audioSettings.isEnabled}
                         onChange={(e) => handleAudioToggle(e.target.checked)}
-                        className={`w-6 h-6 rounded-md border-2 transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${audioSettings.isEnabled
-                          ? 'border-gray-400 text-purple-600 bg-transparent hover:border-purple-500 checked:bg-purple-600 checked:border-purple-600'
+                        className={`w-6 h-6 rounded-md border-2 transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${audioSettings.isEnabled
+                          ? 'border-gray-400 text-blue-600 bg-transparent hover:border-blue-500 checked:bg-blue-600 checked:border-blue-600'
                           : 'border-gray-600 bg-gray-700 cursor-not-allowed opacity-50'
                           }`}
                         aria-describedby="include-audio-description"
@@ -881,7 +879,7 @@ const DownloadSection: React.FC = () => {
                       {/* Enhanced visual feedback overlay */}
                       {audioSettings.isEnabled && (
                         <motion.div
-                          className={`absolute inset-0 rounded-md pointer-events-none ${audioSettings.includeAudio ? 'bg-purple-600/20' : 'bg-transparent'
+                          className={`absolute inset-0 rounded-md pointer-events-none ${audioSettings.includeAudio ? 'bg-blue-600/20' : 'bg-transparent'
                             }`}
                           initial={{ scale: 0.8, opacity: 0 }}
                           animate={{
@@ -990,12 +988,12 @@ const DownloadSection: React.FC = () => {
                         id="anonymize-filename"
                         checked={anonymizeFilenames}
                         onChange={(e) => handleAnonymizeToggle(e.target.checked)}
-                        className="w-6 h-6 rounded-md border-2 transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 border-gray-400 text-purple-600 bg-transparent hover:border-purple-500 checked:bg-purple-600 checked:border-purple-600"
+                        className="w-6 h-6 rounded-md border-2 transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 border-gray-400 text-blue-600 bg-transparent hover:border-blue-500 checked:bg-blue-600 checked:border-blue-600"
                         aria-describedby="anonymize-filename-description"
                       />
                       {/* Enhanced visual feedback overlay */}
                       <motion.div
-                        className={`absolute inset-0 rounded-md pointer-events-none ${anonymizeFilenames ? 'bg-purple-600/20' : 'bg-transparent'}`}
+                        className={`absolute inset-0 rounded-md pointer-events-none ${anonymizeFilenames ? 'bg-blue-600/20' : 'bg-transparent'}`}
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{
                           scale: anonymizeFilenames ? 1 : 0.8,
@@ -1124,9 +1122,7 @@ const DownloadSection: React.FC = () => {
             <motion.button
               onClick={handleDownload}
               disabled={!url.trim()}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-primary w-full md:w-auto flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed glass-effect-strong hover:shadow-purple-500/25"
+              className="btn-primary w-full md:w-auto flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="w-5 h-5" />
               <span>{t('download_section.start_download_button')}</span>
@@ -1142,7 +1138,7 @@ const DownloadSection: React.FC = () => {
             className="glass-effect rounded-2xl p-8"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Play className="w-4 h-4 text-white" />
               </div>
               <span>{t('download_section.download_queue_title')}</span>
@@ -1155,7 +1151,7 @@ const DownloadSection: React.FC = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="glass-card rounded-xl p-4 hover:scale-[1.02] transition-all duration-300"
+                  className="glass-card rounded-xl p-4 transition-colors duration-150"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
@@ -1182,9 +1178,9 @@ const DownloadSection: React.FC = () => {
                               <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                className="flex items-center space-x-1 px-2 py-1 bg-purple-600/20 border border-purple-500/30 rounded-full"
+                                className="flex items-center space-x-1 px-2 py-1 bg-blue-600/20 border border-blue-500/30 rounded-full"
                               >
-                                <Shield className="w-3 h-3 text-purple-400" />
+                                <Shield className="w-3 h-3 text-blue-400" />
                                 <span className="text-xs text-purple-300 font-medium">{t('download_section.ui.anonymous')}</span>
                               </motion.div>
                             </Tooltip>
@@ -1194,7 +1190,7 @@ const DownloadSection: React.FC = () => {
                           <div className="flex items-center space-x-2 mt-1">
                             <p className="text-gray-400 text-sm">{download.filename}</p>
                             {download.isAnonymized && (
-                              <span className="text-xs text-purple-400 bg-purple-900/30 px-2 py-0.5 rounded">
+                              <span className="text-xs text-blue-400 bg-purple-900/30 px-2 py-0.5 rounded">
                                 {t('download_section.ui.anonymized')}
                               </span>
                             )}
@@ -1214,7 +1210,7 @@ const DownloadSection: React.FC = () => {
                             content={t('download_section.ui.file_saved_anonymized')}
                             position="left"
                           >
-                            <div className="w-2 h-2 bg-purple-500 rounded-full shadow-purple-500/50 shadow-sm" />
+                            <div className="w-2 h-2 bg-blue-400 rounded-full" />
                           </Tooltip>
                         )}
                         <span className="text-sm text-gray-400">
@@ -1229,7 +1225,7 @@ const DownloadSection: React.FC = () => {
                     <motion.div
                       className={`h-2 rounded-full ${download.status === 'completed' ? 'bg-green-500' :
                         download.status === 'error' ? 'bg-red-500' :
-                          'bg-gradient-to-r from-lilac-500 to-purple-600'
+                          'bg-blue-500'
                         }`}
                       initial={{ width: 0 }}
                       animate={{ width: `${download.progress}%` }}

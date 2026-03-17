@@ -6,21 +6,7 @@ export default {
   ],
   theme: {
     extend: {
-      colors: {
-        lilac: {
-          50: '#faf8ff',
-          100: '#f3f0ff',
-          200: '#e9e5ff',
-          300: '#d4cdff',
-          400: '#b4a5ff',
-          500: '#9575ff',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-          950: '#2e1065',
-        }
-      },
+      colors: {},
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'bounce-subtle': 'bounce 2s infinite',

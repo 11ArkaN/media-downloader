@@ -65,7 +65,7 @@ function App() {
       try {
         setInstallMessage('Checking dependencies...')
         const deps = await invoke<{ ytdlp_installed: boolean, ffmpeg_installed: boolean }>('check_dependencies')
-        
+
         if (deps.ytdlp_installed && deps.ffmpeg_installed) {
           localStorage.setItem('dependency-check-status', 'installed')
           localStorage.setItem('dependency-check-time', Date.now().toString())
@@ -93,8 +93,8 @@ function App() {
   }, [showDependencyOverlay])
 
   const tabVariants = {
-    inactive: { scale: 0.95, opacity: 0.7 },
-    active: { scale: 1, opacity: 1 }
+    inactive: { opacity: 0.6 },
+    active: { opacity: 1 }
   }
 
   const contentVariants = {
@@ -104,10 +104,10 @@ function App() {
   }
 
   const tabs = [
-    { id: 'download' as const, icon: Download, label: t('app.tabs.download'), color: 'from-lilac-500 to-purple-600' },
-    { id: 'edit' as const, icon: Film, label: t('app.tabs.edit'), color: 'from-purple-500 to-pink-600' },
-    { id: 'files' as const, icon: Folder, label: t('app.tabs.files'), color: 'from-blue-500 to-cyan-600' },
-    { id: 'settings' as const, icon: Settings, label: t('app.tabs.settings'), color: 'from-gray-500 to-gray-700' }
+    { id: 'download' as const, icon: Download, label: t('app.tabs.download'), color: 'bg-blue-500' },
+    { id: 'edit' as const, icon: Film, label: t('app.tabs.edit'), color: 'bg-blue-600' },
+    { id: 'files' as const, icon: Folder, label: t('app.tabs.files'), color: 'bg-blue-600' },
+    { id: 'settings' as const, icon: Settings, label: t('app.tabs.settings'), color: 'bg-gray-600' }
   ]
 
   const handleVideoSelect = (file: any) => {
@@ -128,38 +128,8 @@ function App() {
     <>
       <TitleBar />
       {showDependencyOverlay && <DependencyInstaller message={installMessage} />}
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-purple-950/20 p-6 pt-16">
+      <div className="min-h-screen bg-[#0c0c0e] p-6 pt-16">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <motion.header
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <div className="glass-effect-strong rounded-2xl p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-lilac-500 to-purple-600 rounded-xl flex items-center justify-center">
-                    <Download className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-lilac-200 bg-clip-text text-transparent">
-                      {t('app.title')}
-                    </h1>
-                    <p className="text-gray-400 text-sm">{t('app.subtitle')}</p>
-                  </div>
-                </div>
-
-                {/* Status indicator */}
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-green-400 text-sm font-medium">{t('app.status')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.header>
 
           {/* Navigation Tabs */}
           <motion.nav
@@ -177,14 +147,12 @@ function App() {
                       key={tab.id}
                       variants={tabVariants}
                       animate={activeTab === tab.id ? 'active' : 'inactive'}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       onClick={() => setActiveTab(tab.id)}
                       className={`
-                      flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold transition-all duration-300
+                      flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold transition-colors duration-150
                       ${activeTab === tab.id
-                          ? `bg-gradient-to-r ${tab.color} text-white shadow-lg shadow-${tab.id === 'download' ? 'lilac' : tab.id === 'edit' ? 'purple' : tab.id === 'files' ? 'blue' : 'gray'}-500/25 scale-105`
-                          : 'text-gray-400 hover:text-white glass-button'
+                          ? `${tab.color} text-white`
+                          : 'text-gray-400 hover:text-white hover:bg-white/[0.06]'
                         }
                     `}
                     >
@@ -212,7 +180,7 @@ function App() {
           ))}
         </div>
       </div>
-      
+
       {/* Global Notification Container */}
       <NotificationContainer
         notifications={notifications}

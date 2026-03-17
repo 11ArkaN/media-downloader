@@ -211,7 +211,7 @@ const SettingsSection: React.FC = () => {
     {
       title: t('settings.sections.download.title'),
       icon: Download,
-      color: 'from-blue-500 to-cyan-600',
+      color: 'bg-blue-600',
       settings: [
         {
           key: 'downloadPath',
@@ -248,7 +248,7 @@ const SettingsSection: React.FC = () => {
     {
       title: t('settings.sections.application.title'),
       icon: Monitor,
-      color: 'from-purple-500 to-pink-600',
+      color: 'bg-blue-600',
       settings: [
         {
           key: 'theme',
@@ -322,15 +322,15 @@ const SettingsSection: React.FC = () => {
             onClick={() => updateSetting(setting.key, !value)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
               value 
-                ? 'bg-gradient-to-r from-purple-500/80 to-pink-500/80 backdrop-blur-md border border-purple-400/30 shadow-lg shadow-purple-500/25' 
-                : 'bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 hover:border-white/30'
+                ? 'bg-blue-500 border border-blue-400' 
+                : 'bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-white/[0.15]'
             }`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full transition-all duration-300 ${
                 value 
-                  ? 'translate-x-6 bg-white shadow-lg shadow-purple-500/30' 
-                  : 'translate-x-1 bg-white/90 backdrop-blur-sm'
+                  ? 'translate-x-6 bg-white' 
+                  : 'translate-x-1 bg-gray-400'
               }`}
             />
           </motion.button>
@@ -375,7 +375,7 @@ const SettingsSection: React.FC = () => {
             />
             <button 
               onClick={() => selectPath(setting.key)}
-              className="glass-button px-4 py-3 rounded-lg hover:scale-105 transition-transform"
+              className="glass-button px-4 py-3 rounded-lg transition-colors duration-150"
             >
               <Folder className="w-4 h-4" />
             </button>
@@ -405,7 +405,7 @@ const SettingsSection: React.FC = () => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-gray-500 to-gray-700 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gray-600 rounded-lg flex items-center justify-center">
               <Settings className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -418,7 +418,7 @@ const SettingsSection: React.FC = () => {
             <button
               onClick={checkDependencies}
               disabled={isCheckingDeps}
-              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-150"
             >
               <Shield className={`w-4 h-4 ${isCheckingDeps ? 'animate-spin' : ''}`} />
               <span>{isCheckingDeps ? t('settings.dependencies.checking_button') : t('settings.dependencies.check_button')}</span>
@@ -427,7 +427,7 @@ const SettingsSection: React.FC = () => {
             <button
               onClick={saveSettings}
               disabled={isSaving}
-              className="btn-primary flex items-center space-x-2 glass-effect-strong hover:shadow-purple-500/25"
+              className="btn-primary flex items-center space-x-2"
             >
               {isSaving ? (
                 <>
@@ -509,7 +509,7 @@ const SettingsSection: React.FC = () => {
             <button
               onClick={forceInstallDependencies}
               disabled={isInstallingDeps}
-              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-150"
             >
               <RefreshCw className={`w-4 h-4 ${isInstallingDeps ? 'animate-spin' : ''}`} />
               <span>{isInstallingDeps ? t('settings.debug.installing_button') : t('settings.debug.force_install_button')}</span>
@@ -517,7 +517,7 @@ const SettingsSection: React.FC = () => {
             
             <button
               onClick={getInstallationLogs}
-              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+              className="glass-button flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-150"
             >
               <Eye className="w-4 h-4" />
               <span>{t('settings.debug.view_logs_button')}</span>
@@ -590,7 +590,7 @@ const SettingsSection: React.FC = () => {
             className="glass-effect rounded-2xl p-8"
           >
             <div className="flex items-center space-x-3 mb-6">
-              <div className={`w-8 h-8 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}>
+              <div className={`w-8 h-8 ${section.color} rounded-lg flex items-center justify-center`}>
                 <Icon className="w-4 h-4 text-white" />
               </div>
               <h3 className="text-xl font-bold text-white">{section.title}</h3>
@@ -625,7 +625,7 @@ const SettingsSection: React.FC = () => {
         className="glass-effect rounded-2xl p-8"
       >
         <div className="flex items-center space-x-3 mb-6">
-          <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-red-700 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
             <Eye className="w-4 h-4 text-white" />
           </div>
           <h3 className="text-xl font-bold text-white">{t('settings.debug.title')}</h3>
@@ -635,7 +635,7 @@ const SettingsSection: React.FC = () => {
           <button
             onClick={forceInstallDependencies}
             disabled={isInstallingDeps}
-            className="btn-primary flex items-center space-x-2 w-full glass-effect-strong hover:shadow-red-500/25"
+            className="btn-primary flex items-center space-x-2 w-full"
           >
             {isInstallingDeps ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -647,7 +647,7 @@ const SettingsSection: React.FC = () => {
 
           <button
             onClick={getInstallationLogs}
-            className="glass-button flex items-center space-x-2 w-full px-4 py-2 rounded-lg hover:scale-105 transition-transform"
+            className="glass-button flex items-center space-x-2 w-full px-4 py-2 rounded-lg transition-colors duration-150"
           >
             <Eye className="w-4 h-4" />
             <span>{t('settings.debug.view_logs_button')}</span>
