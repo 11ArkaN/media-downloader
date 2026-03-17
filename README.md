@@ -54,6 +54,10 @@ Build artifacts are written under `src-tauri/target/`.
 - Downloaded and converted media stay on the local machine unless the user moves or shares them.
 - Respect the terms of service and copyright rules for any source you download from.
 
+## Website
+
+Landing page source: [media-downloader-website](https://github.com/11ArkaN/media-downloader-website)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
